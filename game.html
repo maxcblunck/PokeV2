@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PokéCross</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0f172a;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 12px 0 24px; font-family: 'Segoe UI', sans-serif;
+  color: #f8fafc; user-select: none;
+}
+#hud {
+  display: flex; align-items: center; gap: 24px; margin-bottom: 8px;
+  font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8;
+}
+#hud strong { color: #f8fafc; }
+#wrap { position: relative; border: 2px solid #334155; border-radius: 6px; overflow: hidden; }
+canvas { display: block; }
+.ov {
+  position: absolute; inset: 0; background: rgba(15,23,42,.92);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+}
+.ov.hide { display: none; }
+.ov h2 { font-size: 1.5rem; }
+.sc  { font-size: 2.8rem; font-weight: 900; color: #fbbf24; }
+.bl  { font-size: .75rem; color: #64748b; }
+.btn { background: #22c55e; color: #0f172a; border: none; padding: 11px 30px; border-radius: 6px; font-weight: 700; font-size: .95rem; cursor: pointer; }
+.btn:hover { background: #16a34a; }
+#dpad { display: none; margin-top: 10px; gap: 4px; grid-template-columns: repeat(3,58px); grid-template-rows: repeat(3,58px); }
+@media (pointer: coarse) { #dpad { display: grid; } }
+.db { background: #1e293b; border: 1px solid #475569; border-radius: 8px; font-size: 1.4rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.db:active { background: #334155; }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div>Route <strong id="hR">1</strong></div>
+  <div>Steps <strong id="hS">0</strong></div>
+  <div>Best  <strong id="hB">0</strong></div>
+  <div id="hBiome" style="color:#fbbf24;font-weight:600;"></div>
+</div>
+
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div class="ov hide" id="sOver">
+    <div style="font-size:2.5rem">💥</div>
+    <h2>Game Over!</h2>
+    <div class="sc" id="oScore">0</div>
+    <div class="bl">BEST: <span id="oBest">0</span></div>
+    <button class="btn" id="bRetry">PLAY AGAIN</button>
+  </div>
+</div>
+
+<div id="dpad">
+  <div></div><button class="db" id="dU">▲</button><div></div>
+  <button class="db" id="dL">◀</button><div></div><button class="db" id="dR">▶</button>
+  <div></div><button class="db" id="dD">▼</button><div></div>
+</div>
+
+<script>
+// ── CONSTANTS ─────────────────────────────────────────────────
+const TILE=64, COLS=9, VIS=11, W=COLS*TILE, H=VIS*TILE;
+const HOP_S=0.13, BELOW=2, MAX_DT=0.05, PI=Math.PI;
+
+const canvas=document.getElementById('c');
+canvas.width=W; canvas.height=H;
+const ctx=canvas.getContext('2d');
+
+// ── IMAGE LOADING ─────────────────────────────────────────────
+const ART     = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/';
+const ANIMATED = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/';
+
+const POKEDEX = {
+  pikachu:25, charmander:4, bulbasaur:1, squirtle:7,
+  // grass biome
+  rapidash:78, doduo:84, snorlax:143, lapras:131, rayquaza:384,
+  // water biome
+  gyarados:130, vaporeon:134, dewgong:87, lugia:249,
+  // fire biome
+  arcanine:59, magmar:126, moltres:146, slugma:218,
+  // electric biome
+  electrode:101, jolteon:135, raichu:26, zapdos:145, lanturn:171,
+};
+
+// width in tiles for each pokemon
+const MON_SIZE = {
+  snorlax:2.0, rapidash:1.5, doduo:1.0,
+  gyarados:2.5, vaporeon:1.5, dewgong:1.5,
+  arcanine:1.5, magmar:1.0,
+  electrode:0.8, jolteon:1.0, raichu:1.0,
+  lapras:2.0, slugma:1.2, lanturn:1.5,
+  rayquaza:4.0, lugia:4.5, moltres:3.5, zapdos:3.5,
+};
+
+const BIOMES = [
+  {
+    name:'Kanto Forest',
+    roadMon:['snorlax','rapidash','doduo'], waterMon:'lapras', skyBoss:'rayquaza',
+    pal:{ grass:['#166534','#15803d'], road:['#1f2937','#374151'], water:['#1e40af','#1d4ed8'], sky:['#1e1b4b','#312e81'] },
+    groundStyle:'forest', roadStyle:'asphalt', waterStyle:'river', skyStyle:'space',
+  },
+  {
+    name:'Ocean Route',
+    roadMon:['gyarados','vaporeon','dewgong'], waterMon:'lapras', skyBoss:'lugia',
+    pal:{ grass:['#0c4d6b','#0a5a7a'], road:['#1e3a8a','#1e40af'], water:['#0c2461','#0a3580'], sky:['#091628','#0d2040'] },
+    groundStyle:'beach', roadStyle:'seafloor', waterStyle:'deep_ocean', skyStyle:'aurora',
+  },
+  {
+    name:'Volcano Pass',
+    roadMon:['arcanine','magmar','rapidash'], waterMon:'slugma', skyBoss:'moltres',
+    pal:{ grass:['#7c2d12','#9a3412'], road:['#451a03','#6b2100'], water:['#7f1d1d','#991b1b'], sky:['#1c0a00','#3d1a00'] },
+    groundStyle:'volcanic', roadStyle:'lava', waterStyle:'magma', skyStyle:'embers',
+  },
+  {
+    name:'Thunder Circuit',
+    roadMon:['electrode','jolteon','raichu'], waterMon:'lanturn', skyBoss:'zapdos',
+    pal:{ grass:['#1a1a2e','#16213e'], road:['#0d0d1a','#12122a'], water:['#1a0533','#200540'], sky:['#0a0a1a','#111128'] },
+    groundStyle:'city', roadStyle:'highway', waterStyle:'electric_stream', skyStyle:'storm',
+  },
+];
+
+function getBiomeAt(row){ return BIOMES[Math.floor(row/25)%4]; }
+
+// hidden container keeps GIFs in the DOM so browsers advance their frames
+const sprCache=document.createElement('div');
+sprCache.style.cssText='position:absolute;opacity:0;pointer-events:none;width:0;height:0;overflow:hidden';
+document.body.appendChild(sprCache);
+
+const animImgs={}, artImgs={};
+Object.entries(POKEDEX).forEach(([k,id])=>{
+  const g=new Image(); g.crossOrigin='anonymous'; g.src=ANIMATED+id+'.gif';
+  sprCache.appendChild(g); animImgs[k]=g;
+  const a=new Image(); a.crossOrigin='anonymous'; a.src=ART+id+'.png'; artImgs[k]=a;
+});
+
+function drawImg(img,x,y,w,h,flipH){
+  if(!img||!img.complete||!img.naturalWidth) return;
+  if(flipH){
+    ctx.save(); ctx.translate(x+w,y); ctx.scale(-1,1);
+    ctx.drawImage(img,0,0,w,h); ctx.restore();
+  } else {
+    ctx.drawImage(img,x,y,w,h);
+  }
+}
+
+// ── GAME STATE ────────────────────────────────────────────────
+let gState='charselect';
+let selectedChar=0;
+let camRow=0, score=0, lanes={}, maxGen=0, player=null;
+let frameCount=0, screenShake=0, gameTime=0;
+let best=+localStorage.getItem('pkx5')||0;
+document.getElementById('hB').textContent=best;
+
+const CHAR_KEYS =['pikachu','charmander','bulbasaur','squirtle'];
+const CHAR_NAMES=['Pikachu','Charmander','Bulbasaur','Squirtle'];
+const CHAR_COLS =['#fbbf24','#f97316','#4ade80','#60a5fa'];
+
+// ── LANE GENERATION ───────────────────────────────────────────
+const SEQ=['grass','road','road','grass','water','water','grass',
+           'road','road','road','grass','water','grass','road',
+           'grass','water','water','water','grass','road','road','grass'];
+
+function laneTypeAt(row){
+  if(row<=1) return 'grass';
+  if(row>=30&&(row-30)%28===0) return 'sky';
+  return SEQ[(row-2)%SEQ.length];
+}
+function diffAt(row){ return 1+Math.min(row/40,2.5); }
+
+function makeTrees(row){
+  if(row<=1) return [];
+  const cols=new Set(); let t=0;
+  while(cols.size<1+Math.floor(Math.random()*3)&&t++<30)
+    cols.add(Math.floor(Math.random()*COLS));
+  const free=Array.from({length:COLS},(_,i)=>i).filter(c=>!cols.has(c));
+  if(!free.some(c=>free.includes(c+1))) cols.delete([...cols][0]);
+  return [...cols];
+}
+
+function makeLane(row){
+  const type=laneTypeAt(row);
+  if(type==='grass') return {row,type,obs:[],trees:makeTrees(row)};
+
+  const diff=diffAt(row), dir=Math.random()<.5?1:-1, obs=[];
+
+  const biome=getBiomeAt(row);
+  if(type==='sky'){
+    const boss=biome.skyBoss;
+    const bossW=(MON_SIZE[boss]||4)*TILE;
+    const spd=(350+Math.random()*100)*diff*dir;
+    obs.push({x:dir>0?-(bossW+TILE*2):W+TILE*2, w:bossW, spd, shook:false, pokemon:boss});
+    return {row,type,obs};
+  }
+
+  const count=2+Math.floor(Math.random()*2), gap=W/count;
+  if(type==='road'){
+    const spd=(85+Math.random()*70)*diff*dir;
+    const pool=biome.roadMon;
+    for(let i=0;i<count;i++){
+      const pokemon=pool[Math.floor(Math.random()*pool.length)];
+      const w=(MON_SIZE[pokemon]||1)*TILE;
+      obs.push({x:i*gap+Math.random()*gap*.4, w, spd, pokemon});
+    }
+    obs.sort((a,b)=>a.x-b.x);
+    for(let i=1;i<obs.length;i++){
+      const minX=obs[i-1].x+obs[i-1].w+12;
+      if(obs[i].x<minX) obs[i].x=minX;
+    }
+  } else {
+    const spd=(50+Math.random()*45)*diff*dir;
+    const logMon=biome.waterMon;
+    const logW=(MON_SIZE[logMon]||2)*TILE;
+    for(let i=0;i<count;i++){
+      obs.push({x:i*gap+Math.random()*gap*.3, w:logW, spd, pokemon:logMon});
+    }
+    obs.sort((a,b)=>a.x-b.x);
+    for(let i=1;i<obs.length;i++){
+      const minX=obs[i-1].x+obs[i-1].w+12;
+      if(obs[i].x<minX) obs[i].x=minX;
+    }
+  }
+  return {row,type,obs};
+}
+
+function ensureLanes(upto){
+  for(let r=maxGen;r<=upto;r++) if(!lanes[r]) lanes[r]=makeLane(r);
+  if(upto>maxGen) maxGen=upto;
+}
+
+// ── COORDINATES ───────────────────────────────────────────────
+function rowY(r){ return H-TILE-(r-camRow)*TILE; }
+
+// ── INIT ──────────────────────────────────────────────────────
+function initGame(){
+  lanes={}; maxGen=0; score=0; camRow=-BELOW; gameTime=0;
+  ensureLanes(VIS+6);
+  const sc=Math.floor(COLS/2);
+  player={col:sc,row:0,x:sc*TILE,fromRow:0,fromX:sc*TILE,moving:false,hopT:0,dead:false};
+}
+
+// ── MOVEMENT ──────────────────────────────────────────────────
+function tryHop(dc,dr){
+  if(!player||player.moving||player.dead||gState!=='play') return;
+  const nc=player.col+dc, nr=player.row+dr;
+  if(nc<0||nc>=COLS) return;
+  ensureLanes(nr+2);
+  const dl=lanes[nr];
+  if(dl&&dl.trees&&dl.trees.includes(nc)) return;
+  player.fromRow=player.row; player.fromX=player.x;
+  player.col=nc; player.row=nr; player.moving=true; player.hopT=0;
+  if(nr>score){ score=nr; if(score>best){best=score;localStorage.setItem('pkx5',best);} }
+}
+
+function easeIO(t){ return t<.5?2*t*t:-1+(4-2*t)*t; }
+
+// Fixed span and fixed triggers so same-speed obstacles with different
+// widths don't drift relative to each other across wrap cycles.
+const WRAP_SPAN = W + TILE * 6;
+function wrapOb(ob){
+  if(ob.spd>0 && ob.x > W + TILE*3)          ob.x -= WRAP_SPAN;
+  if(ob.spd<0 && ob.x + ob.w < -TILE*3)      ob.x += WRAP_SPAN;
+}
+
+// ── COLLISION ─────────────────────────────────────────────────
+function logUnder(px){
+  const ln=lanes[player.row]; if(!ln||ln.type!=='water') return null;
+  const x=(px!==undefined?px:player.x)+TILE*.15, pw=TILE*.7;
+  for(const ob of ln.obs){
+    const safeX=ob.x+(ob.w-TILE)/2;
+    if(x<safeX+TILE-2&&x+pw>safeX+2) return ob;
+  }
+  return null;
+}
+function carHit(px){
+  const ln=lanes[player.row]; if(!ln||ln.type!=='road') return false;
+  const x=(px!==undefined?px:player.x)+10, pw=TILE-20;
+  for(const ob of ln.obs) if(x<ob.x+ob.w-6&&x+pw>ob.x+6) return true;
+  return false;
+}
+function skyHit(){
+  const ln=lanes[player.row]; if(!ln||ln.type!=='sky') return false;
+  const x=player.x+10, pw=TILE-20;
+  for(const ob of ln.obs) if(x<ob.x+ob.w&&x+pw>ob.x) return true;
+  return false;
+}
+function kill(){
+  if(!player||player.dead) return;
+  player.dead=true; gState='dead';
+  document.getElementById('oScore').textContent=score;
+  document.getElementById('oBest').textContent=best;
+  document.getElementById('sOver').classList.remove('hide');
+}
+function onLand(){
+  const ln=lanes[player.row]; if(!ln) return;
+  if(ln.type==='water'&&!logUnder()) { kill(); return; }
+  if(ln.type==='road' &&carHit())    { kill(); return; }
+  if(ln.type==='sky'  &&skyHit())    { kill(); return; }
+}
+
+// ── UPDATE ────────────────────────────────────────────────────
+let prevTs=0;
+function update(ts){
+  if(gState!=='play'||!player||player.dead) return;
+  const dt=Math.min((ts-prevTs)/1000,MAX_DT);
+  prevTs=ts; frameCount++; gameTime+=dt;
+  if(screenShake>0) screenShake=Math.max(0,screenShake-dt*35);
+  ensureLanes(player.row+VIS+6);
+
+  const r0=Math.floor(camRow)-2, r1=r0+VIS+6;
+  for(let r=r0;r<=r1;r++){
+    const ln=lanes[r]; if(!ln||ln.type==='grass') continue;
+    for(const ob of ln.obs){
+      ob.x+=ob.spd*dt; wrapOb(ob);
+      if(ln.type==='sky'&&!ob.shook){
+        const cx=ob.x+ob.w/2;
+        if(cx>W*.25&&cx<W*.75){ ob.shook=true; screenShake=10; }
+      }
+    }
+  }
+
+  if(player.moving){
+    player.hopT+=dt;
+    const t=Math.min(player.hopT/HOP_S,1);
+    player.x=player.fromX+(player.col*TILE-player.fromX)*easeIO(t);
+    if(t>=1){ player.x=player.col*TILE; player.moving=false; onLand(); }
+  } else {
+    const ln=lanes[player.row];
+    if(ln&&ln.type==='water'){
+      const log=logUnder(); if(!log){ kill(); return; }
+      player.x+=log.spd*dt;
+      player.col=Math.max(0,Math.min(COLS-1,Math.round(player.x/TILE)));
+      if(player.x<-TILE*.4||player.x>W-TILE*.6){ kill(); return; }
+    }
+    if(ln&&ln.type==='road'&&carHit()){ kill(); return; }
+    if(ln&&ln.type==='sky' &&skyHit()){ kill(); return; }
+  }
+
+  const tc=player.row-BELOW;
+  if(tc>camRow) camRow+=(tc-camRow)*Math.min(dt*12,1);
+  if(rowY(player.row)>H+TILE*1.5){ kill(); return; }
+
+  document.getElementById('hS').textContent=score;
+  document.getElementById('hR').textContent=Math.floor(score/15)+1;
+  document.getElementById('hB').textContent=best;
+  document.getElementById('hBiome').textContent=getBiomeAt(player.row).name;
+}
+
+// ── DRAW HELPERS ──────────────────────────────────────────────
+function drawGroundOb(col,sy,biome){
+  const cx=col*TILE+TILE/2, cy=sy+TILE/2-2, r=TILE*.37;
+  const style=biome?biome.groundStyle:'forest';
+  if(style==='forest'){
+    ctx.fillStyle='rgba(0,0,0,0.22)'; ctx.beginPath();
+    ctx.ellipse(cx+2,sy+TILE-6,r*.78,r*.28,0,0,PI*2); ctx.fill();
+    ctx.fillStyle='#7c3a1e'; ctx.fillRect(cx-5,cy+r-6,11,18);
+    ctx.fillStyle='#14532d'; ctx.beginPath(); ctx.arc(cx+2,cy+2,r,0,PI*2); ctx.fill();
+    ctx.fillStyle='#16a34a'; ctx.beginPath(); ctx.arc(cx-1,cy-2,r*.87,0,PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.13)'; ctx.beginPath();
+    ctx.ellipse(cx-5,cy-7,r*.42,r*.42,0,0,PI*2); ctx.fill();
+  } else if(style==='beach'){
+    // palm tree
+    ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.beginPath();
+    ctx.ellipse(cx+2,sy+TILE-6,r*.78,r*.28,0,0,PI*2); ctx.fill();
+    ctx.strokeStyle='#a16207'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.moveTo(cx,sy+TILE-8); ctx.quadraticCurveTo(cx+6,cy+r,cx+4,cy); ctx.stroke();
+    ctx.strokeStyle='#84cc16'; ctx.lineWidth=3;
+    for(let a=-0.8;a<=0.8;a+=0.4){
+      ctx.beginPath(); ctx.moveTo(cx+4,cy);
+      ctx.quadraticCurveTo(cx+4+Math.sin(a)*28,cy-10,cx+4+Math.sin(a)*22,cy-22); ctx.stroke();
+    }
+  } else if(style==='volcanic'){
+    // rock spike
+    ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath();
+    ctx.ellipse(cx+2,sy+TILE-6,r*.78,r*.28,0,0,PI*2); ctx.fill();
+    ctx.fillStyle='#44403c';
+    ctx.beginPath(); ctx.moveTo(cx-12,sy+TILE-6); ctx.lineTo(cx+2,cy-10); ctx.lineTo(cx+14,sy+TILE-6);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#78716c';
+    ctx.beginPath(); ctx.moveTo(cx+2,cy-10); ctx.lineTo(cx+14,sy+TILE-6); ctx.lineTo(cx+8,sy+TILE-6);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(251,146,60,0.5)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(cx,cy+5); ctx.lineTo(cx-3,cy+18); ctx.stroke();
+  } else if(style==='city'){
+    // building
+    const bw=24, bh=32+(col%3)*10;
+    const bx=cx-bw/2, by=sy+TILE-bh-4;
+    ctx.fillStyle='#1e293b'; ctx.fillRect(bx,by,bw,bh);
+    ctx.fillStyle='rgba(251,191,36,0.75)';
+    for(let wy=by+4;wy<sy+TILE-8;wy+=8)
+      for(let wx=bx+3;wx<bx+bw-6;wx+=7)
+        if((col+Math.floor((wy-by)/8))%3!==0) ctx.fillRect(wx,wy,4,5);
+    ctx.fillStyle='#334155'; ctx.fillRect(bx-2,by-3,bw+4,5);
+  }
+}
+
+// ── MAIN DRAW ─────────────────────────────────────────────────
+function draw(){
+  ctx.save();
+  if(screenShake>0) ctx.translate((Math.random()-.5)*screenShake,(Math.random()-.5)*screenShake);
+  ctx.fillStyle='#0f172a'; ctx.fillRect(0,0,W,H);
+
+  if(gState==='charselect'){ drawCharSelect(); ctx.restore(); return; }
+  if(gState==='start')     { ctx.restore(); return; }
+
+  drawWorld();
+  drawPlayer();
+  ctx.restore();
+}
+
+function drawWorld(){
+  const r0=Math.floor(camRow)-1, r1=r0+VIS+4;
+  for(let r=r0;r<=r1;r++){
+    const ln=lanes[r]; if(!ln) continue;
+    const sy=Math.round(rowY(r));
+    if(sy>H+TILE||sy<-TILE*2) continue;
+
+    // lane bg (biome palette)
+    const bm=getBiomeAt(r);
+    ctx.fillStyle=bm.pal[ln.type][r&1]; ctx.fillRect(0,sy,W,TILE);
+
+    // lane details (biome-specific)
+    if(ln.type==='road'){
+      if(bm.roadStyle==='asphalt'){
+        ctx.save(); ctx.setLineDash([16,12]);
+        ctx.strokeStyle='rgba(251,191,36,0.4)'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(0,sy+TILE/2); ctx.lineTo(W,sy+TILE/2); ctx.stroke(); ctx.restore();
+      } else if(bm.roadStyle==='seafloor'){
+        // bubble clusters
+        ctx.fillStyle='rgba(147,210,255,0.18)';
+        for(let b=0;b<6;b++){
+          const bx=(r*53+b*97+gameTime*15)%W;
+          const by2=sy+8+(b*11)%40;
+          const br=2+b%3;
+          ctx.beginPath(); ctx.arc(bx,by2,br,0,PI*2); ctx.fill();
+        }
+        // seaweed sway
+        ctx.strokeStyle='rgba(52,211,153,0.5)'; ctx.lineWidth=2;
+        for(let sw=0;sw<3;sw++){
+          const swx=(r*41+sw*143)%W;
+          const sway=Math.sin(gameTime*2+sw)*6;
+          ctx.beginPath(); ctx.moveTo(swx,sy+TILE);
+          ctx.quadraticCurveTo(swx+sway,sy+TILE/2,swx+sway*0.5,sy+8); ctx.stroke();
+        }
+      } else if(bm.roadStyle==='lava'){
+        // glowing lava cracks
+        ctx.strokeStyle='rgba(251,146,60,0.55)'; ctx.lineWidth=2;
+        for(let c2=0;c2<4;c2++){
+          const lx=(r*67+c2*111)%W;
+          ctx.beginPath(); ctx.moveTo(lx,sy+TILE); ctx.lineTo(lx+12,sy+TILE/2); ctx.lineTo(lx+4,sy+4); ctx.stroke();
+        }
+        // lava glow pulse
+        const pulse=Math.abs(Math.sin(gameTime*1.8+r))*0.12;
+        ctx.fillStyle=`rgba(239,68,68,${pulse})`; ctx.fillRect(0,sy,W,TILE);
+      } else if(bm.roadStyle==='highway'){
+        // white lane markers
+        ctx.save(); ctx.setLineDash([20,10]);
+        ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(0,sy+TILE/2); ctx.lineTo(W,sy+TILE/2); ctx.stroke(); ctx.restore();
+        // neon edge lines
+        ctx.strokeStyle='rgba(167,139,250,0.35)'; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(0,sy+4); ctx.lineTo(W,sy+4); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0,sy+TILE-4); ctx.lineTo(W,sy+TILE-4); ctx.stroke();
+      }
+    } else if(ln.type==='water'){
+      if(bm.waterStyle==='river'){
+        const wx=(gameTime*55)%(W*2);
+        ctx.fillStyle='rgba(147,197,253,0.12)';
+        for(let ox=wx-W*2;ox<W+W;ox+=W){ ctx.fillRect(ox,sy+7,W,7); ctx.fillRect(ox,sy+38,W,5); }
+      } else if(bm.waterStyle==='deep_ocean'){
+        const wx=(gameTime*30)%(W*2);
+        ctx.fillStyle='rgba(96,165,250,0.08)';
+        for(let ox=wx-W*2;ox<W+W;ox+=W){ ctx.fillRect(ox,sy+10,W,9); ctx.fillRect(ox,sy+36,W,6); }
+        // bioluminescent dots
+        ctx.fillStyle='rgba(52,211,153,0.4)';
+        for(let d=0;d<5;d++){
+          const dx=(r*73+d*137+gameTime*8)%W;
+          const dy=sy+10+(d*9)%44;
+          const glow=Math.abs(Math.sin(gameTime*3+d))*2.5;
+          ctx.beginPath(); ctx.arc(dx,dy,glow,0,PI*2); ctx.fill();
+        }
+      } else if(bm.waterStyle==='magma'){
+        // lava flow bubbles
+        const pulse=Math.abs(Math.sin(gameTime*2.5+r));
+        ctx.fillStyle=`rgba(251,146,60,${0.1+pulse*0.15})`; ctx.fillRect(0,sy,W,TILE);
+        ctx.fillStyle='rgba(239,68,68,0.3)';
+        for(let b=0;b<4;b++){
+          const bx=(r*61+b*89+gameTime*12)%W;
+          const br=3+b%4;
+          ctx.beginPath(); ctx.arc(bx,sy+TILE*.6,br,0,PI*2); ctx.fill();
+        }
+      } else if(bm.waterStyle==='electric_stream'){
+        // electric pulses
+        const ex=(gameTime*80)%(W*2);
+        ctx.strokeStyle='rgba(167,139,250,0.3)'; ctx.lineWidth=3;
+        for(let ox=ex-W*2;ox<W+W;ox+=W*0.5){
+          ctx.beginPath(); ctx.moveTo(ox,sy+TILE/2);
+          ctx.lineTo(ox+12,sy+TILE/2-8); ctx.lineTo(ox+24,sy+TILE/2+8);
+          ctx.lineTo(ox+36,sy+TILE/2); ctx.stroke();
+        }
+        const zpulse=Math.abs(Math.sin(gameTime*4+r))*0.1;
+        ctx.fillStyle=`rgba(250,204,21,${zpulse})`; ctx.fillRect(0,sy,W,TILE);
+      }
+    } else if(ln.type==='sky'){
+      if(bm.skyStyle==='space'){
+        ctx.fillStyle='rgba(255,255,255,0.5)';
+        for(let s=0;s<8;s++){
+          const sx=(r*37+s*71)%W, sy2=sy+((r*13+s*29)%TILE);
+          const blink=Math.abs(Math.sin(frameCount*.04+s))*1.5;
+          ctx.beginPath(); ctx.arc(sx,sy2,blink,0,PI*2); ctx.fill();
+        }
+      } else if(bm.skyStyle==='aurora'){
+        for(let a=0;a<3;a++){
+          const wave=Math.sin(gameTime*0.8+a+r*0.1)*12;
+          ctx.strokeStyle=`rgba(52,211,153,${0.25+a*0.1})`; ctx.lineWidth=6+a*3;
+          ctx.beginPath(); ctx.moveTo(0,sy+TILE/2+wave);
+          ctx.quadraticCurveTo(W/2,sy+TILE/2-wave*1.5,W,sy+TILE/2+wave*0.5); ctx.stroke();
+        }
+      } else if(bm.skyStyle==='embers'){
+        for(let e=0;e<10;e++){
+          const ex=(r*43+e*79+gameTime*25)%W;
+          const ey=sy+((r*17+e*53+gameTime*18)%TILE);
+          const er=1+e%2;
+          const alpha=Math.abs(Math.sin(gameTime*4+e))*0.8;
+          ctx.fillStyle=`rgba(251,146,60,${alpha})`;
+          ctx.beginPath(); ctx.arc(ex,ey,er,0,PI*2); ctx.fill();
+        }
+      } else if(bm.skyStyle==='storm'){
+        // dark stormclouds tint
+        ctx.fillStyle='rgba(15,10,30,0.3)'; ctx.fillRect(0,sy,W,TILE);
+        // lightning flash
+        const flash=Math.abs(Math.sin(gameTime*6+r*2));
+        if(flash>0.92){
+          ctx.fillStyle=`rgba(250,204,21,${(flash-0.92)*8})`; ctx.fillRect(0,sy,W,TILE);
+        }
+      }
+    } else {
+      if(ln.trees) ln.trees.forEach(col=>drawGroundOb(col,sy,bm));
+    }
+
+    // obstacles
+    for(const ob of ln.obs){
+      if(ob.x+ob.w<-TILE*2||ob.x>W+TILE*2) continue;
+      if     (ln.type==='sky')   drawSkyOb(ob,sy);
+      else if(ln.type==='road')  drawRoadOb(ob,sy);
+      else if(ln.type==='water') drawWaterOb(ob,sy);
+    }
+
+    // sky warning arrow
+    if(ln.type==='sky'){
+      for(const ob of ln.obs){
+        const dir=ob.spd>0?1:-1;
+        const offRight=ob.spd>0&&ob.x+ob.w<0;
+        const offLeft =ob.spd<0&&ob.x>W;
+        if(offRight||offLeft){
+          const ex=dir>0?20:W-20;
+          const flash=Math.abs(Math.sin(frameCount*.14));
+          ctx.fillStyle=`rgba(239,68,68,${flash*.8+.2})`;
+          ctx.beginPath(); ctx.arc(ex,sy+TILE/2,14,0,PI*2); ctx.fill();
+          ctx.fillStyle='#fff'; ctx.font='bold 16px serif'; ctx.textAlign='center';
+          ctx.fillText('!',ex,sy+TILE/2+6); ctx.textAlign='left';
+          ctx.fillStyle=`rgba(251,191,36,${flash})`;
+          ctx.beginPath();
+          if(dir>0){ ctx.moveTo(ex+18,sy+TILE/2); ctx.lineTo(ex+32,sy+TILE/2-8); ctx.lineTo(ex+32,sy+TILE/2+8); }
+          else      { ctx.moveTo(ex-18,sy+TILE/2); ctx.lineTo(ex-32,sy+TILE/2-8); ctx.lineTo(ex-32,sy+TILE/2+8); }
+          ctx.closePath(); ctx.fill();
+        }
+      }
+    }
+
+    ctx.fillStyle='rgba(0,0,0,0.22)'; ctx.fillRect(0,sy+TILE-1,W,1);
+  }
+}
+
+function drawShadow(cx,sy,rx,ry){
+  ctx.fillStyle='rgba(0,0,0,0.28)';
+  ctx.beginPath(); ctx.ellipse(cx,sy+TILE-8,rx,ry,0,0,PI*2); ctx.fill();
+}
+
+function drawRoadOb(ob,sy){
+  const flip=ob.spd<0;
+  const cx=ob.x+ob.w/2;
+  const isSnorlax=ob.pokemon==='snorlax';
+  drawShadow(cx,sy, isSnorlax?TILE*.7:TILE*.38, isSnorlax?8:5);
+  const iw=ob.w*0.9, ih=iw;
+  const ix=ob.x+(ob.w-iw)/2;
+  const iy=sy+(TILE-ih)/2;
+  drawImg(animImgs[ob.pokemon], ix, iy, iw, ih, flip);
+}
+
+function drawWaterOb(ob,sy){
+  const flip=ob.spd<0;
+  // ripple ring on water surface
+  const cx=ob.x+ob.w/2;
+  ctx.strokeStyle='rgba(147,197,253,0.35)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.ellipse(cx,sy+TILE-10,ob.w*.42,7,0,0,PI*2); ctx.stroke();
+  // animated Lapras floating
+  const ih=TILE-4, iw=Math.min(ob.w-8, ih*1.4);
+  const ix=ob.x+(ob.w-iw)/2;
+  drawImg(animImgs['lapras'], ix, sy+2, iw, ih, flip);
+}
+
+// trail colours per sky boss
+const SKY_TRAIL={rayquaza:'rgba(109,40,217,0.18)',lugia:'rgba(96,165,250,0.18)',moltres:'rgba(251,146,60,0.22)',zapdos:'rgba(250,204,21,0.22)'};
+
+function drawSkyOb(ob,sy){
+  const flip=ob.spd<0;
+  const boss=ob.pokemon||'rayquaza';
+  // energy trail
+  ctx.fillStyle=SKY_TRAIL[boss]||'rgba(109,40,217,0.18)';
+  const trailW=ob.w*0.6, trailH=TILE*0.4;
+  ctx.fillRect(ob.x+(ob.w-trailW)/2, sy+(TILE-trailH)/2, trailW, trailH);
+  const ih=TILE*1.6, iw=ob.w*0.75;
+  const ix=ob.x+(ob.w-iw)/2;
+  const iy=sy+(TILE-ih)/2;
+  drawImg(animImgs[boss], ix, iy, iw, ih, flip);
+}
+
+function drawPlayer(){
+  let dx,dy;
+  if(player.moving){
+    const t=Math.min(player.hopT/HOP_S,1), e=easeIO(t);
+    dx=player.fromX+(player.col*TILE-player.fromX)*e;
+    dy=rowY(player.fromRow)+(rowY(player.row)-rowY(player.fromRow))*e
+      -Math.sin(t*PI)*16;
+  } else {
+    dx=player.x;
+    dy=rowY(player.row);
+  }
+  dx=Math.round(dx); dy=Math.round(dy);
+
+  // shadow on ground plane (always at the row's center, not the arc position)
+  ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath();
+  ctx.ellipse(Math.round(player.x)+TILE/2, Math.round(rowY(player.row))+TILE-6, 18,5,0,0,PI*2); ctx.fill();
+
+  // player sprite: centered within the tile (not pushed to top edge)
+  const sprSz=TILE-8;
+  const sx=dx+(TILE-sprSz)/2;
+  const sy=dy+(TILE-sprSz)/2;  // ← centers the character in the lane stripe
+  drawImg(animImgs[CHAR_KEYS[selectedChar]], sx, sy, sprSz, sprSz, false);
+}
+
+// ── CHARACTER SELECT ──────────────────────────────────────────
+const CARDS=[{x:32,y:88,i:0},{x:300,y:88,i:1},{x:32,y:278,i:2},{x:300,y:278,i:3}];
+const CARD_W=240, CARD_H=170;
+const START_BTN={x:(W-180)/2, y:472, w:180, h:46};
+
+// polyfill roundRect for Safari <15.4
+if(!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+    r=Math.min(r,w/2,h/2);
+    this.moveTo(x+r,y); this.lineTo(x+w-r,y); this.quadraticCurveTo(x+w,y,x+w,y+r);
+    this.lineTo(x+w,y+h-r); this.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    this.lineTo(x+r,y+h); this.quadraticCurveTo(x,y+h,x,y+h-r);
+    this.lineTo(x,y+r); this.quadraticCurveTo(x,y,x+r,y); this.closePath();
+  };
+}
+
+function drawCharSelect(){
+  ctx.fillStyle='#0f172a'; ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle='#f8fafc'; ctx.font='bold 22px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('Choose Your Partner!',W/2,52);
+  ctx.font='13px Segoe UI'; ctx.fillStyle='#64748b';
+  ctx.fillText('Arrow keys or WASD • one hop at a time',W/2,72);
+
+  CARDS.forEach(card=>{
+    const sel=selectedChar===card.i;
+    ctx.fillStyle=sel?'#1e293b':'#111827';
+    ctx.beginPath(); ctx.roundRect(card.x,card.y,CARD_W,CARD_H,10); ctx.fill();
+    ctx.strokeStyle=sel?CHAR_COLS[card.i]:'#334155'; ctx.lineWidth=sel?3:1;
+    ctx.beginPath(); ctx.roundRect(card.x,card.y,CARD_W,CARD_H,10); ctx.stroke();
+
+    // clip card area so art doesn't overflow
+    ctx.save(); ctx.beginPath(); ctx.roundRect(card.x+1,card.y+1,CARD_W-2,CARD_H-40,10); ctx.clip();
+    const artSz=120;
+    const ax=card.x+(CARD_W-artSz)/2, ay=card.y+8;
+    drawImg(artImgs[CHAR_KEYS[card.i]], ax, ay, artSz, artSz, false);
+    ctx.restore();
+
+    // name
+    ctx.fillStyle=sel?CHAR_COLS[card.i]:'#94a3b8';
+    ctx.font=`${sel?'bold ':''}14px Segoe UI`; ctx.textAlign='center';
+    ctx.fillText(CHAR_NAMES[card.i], card.x+CARD_W/2, card.y+CARD_H-12);
+
+    // pokéball badge
+    if(sel){
+      const bx=card.x+CARD_W-22, by=card.y+22;
+      ctx.fillStyle=CHAR_COLS[card.i]; ctx.beginPath(); ctx.arc(bx,by,12,0,PI*2); ctx.fill();
+      ctx.fillStyle='#0f172a'; ctx.beginPath(); ctx.arc(bx,by,8,0,PI*2); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.fillRect(bx-12,by-1,24,2);
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(bx,by,3,0,PI*2); ctx.fill();
+    }
+  });
+
+  // START button
+  ctx.fillStyle='#22c55e'; ctx.beginPath();
+  ctx.roundRect(START_BTN.x,START_BTN.y,START_BTN.w,START_BTN.h,8); ctx.fill();
+  ctx.fillStyle='#0f172a'; ctx.font='bold 16px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('START GAME',W/2,START_BTN.y+31);
+  ctx.textAlign='left';
+}
+
+canvas.addEventListener('click',e=>{
+  if(gState!=='charselect') return;
+  const r=canvas.getBoundingClientRect();
+  const mx=(e.clientX-r.left)*(W/r.width), my=(e.clientY-r.top)*(H/r.height);
+  for(const c of CARDS){
+    if(mx>=c.x&&mx<=c.x+CARD_W&&my>=c.y&&my<=c.y+CARD_H){ selectedChar=c.i; return; }
+  }
+  const b=START_BTN;
+  if(mx>=b.x&&mx<=b.x+b.w&&my>=b.y&&my<=b.y+b.h) startGame();
+});
+
+// ── INPUT ─────────────────────────────────────────────────────
+const held=new Set();
+document.addEventListener('keydown',e=>{
+  if(gState==='charselect'){
+    if(e.key==='ArrowLeft' ||e.key==='a') selectedChar=Math.max(0,selectedChar-1);
+    if(e.key==='ArrowRight'||e.key==='d') selectedChar=Math.min(3,selectedChar+1);
+    if(e.key==='Enter'||e.key===' ') startGame();
+    return;
+  }
+  if(gState==='dead'&&(e.key==='Enter'||e.key===' ')){ goCharSelect(); return; }
+  if(held.has(e.key)) return; held.add(e.key);
+  if(e.key==='ArrowUp'   ||e.key==='w') tryHop(0, 1);
+  if(e.key==='ArrowDown' ||e.key==='s') tryHop(0,-1);
+  if(e.key==='ArrowLeft' ||e.key==='a') tryHop(-1,0);
+  if(e.key==='ArrowRight'||e.key==='d') tryHop(1, 0);
+  e.preventDefault();
+});
+document.addEventListener('keyup',e=>held.delete(e.key));
+document.getElementById('dU').addEventListener('click',()=>tryHop(0, 1));
+document.getElementById('dD').addEventListener('click',()=>tryHop(0,-1));
+document.getElementById('dL').addEventListener('click',()=>tryHop(-1,0));
+document.getElementById('dR').addEventListener('click',()=>tryHop(1, 0));
+document.getElementById('bRetry').addEventListener('click',goCharSelect);
+
+// ── LOOP ──────────────────────────────────────────────────────
+function loop(ts){ update(ts); draw(); requestAnimationFrame(loop); }
+
+function startGame(){
+  document.getElementById('sOver').classList.add('hide');
+  initGame(); gState='play'; prevTs=performance.now();
+  document.getElementById('hB').textContent=best;
+}
+function goCharSelect(){
+  document.getElementById('sOver').classList.add('hide');
+  gState='charselect';
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
