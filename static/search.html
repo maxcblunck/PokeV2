@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Card Search — PokéValue</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <style>
+    .search-bar { display:flex; gap:0.75rem; margin-bottom:0.75rem; }
+    .search-bar input { flex:1; }
+    .variant-bar { margin:0.75rem 0; display:flex; align-items:center; gap:0.75rem; }
+    .variant-bar select { flex:1; }
+    #results-section { display:none; margin-top:1.5rem; }
+    .tcg-btn {
+      display:inline-block; margin-top:0.8rem;
+      font-family:'Press Start 2P',monospace; font-size:0.6rem;
+      color:#FFDE00; background:#CC0000; border:2px solid #FFDE00;
+      border-radius:6px; padding:0.5rem 1rem; text-decoration:none;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="section-header">
+      <h2>Card Search</h2>
+      <p>Look up any Pokémon card by name to get a live valuation</p>
+    </div>
+
+    <!-- Search input -->
+    <div class="search-bar">
+      <input type="text" id="query" placeholder="Charizard, Pikachu, Lugia…">
+      <button class="btn" id="search-btn">SEARCH</button>
+    </div>
+    <div id="search-msg"></div>
+
+    <!-- Card picker -->
+    <div id="picker-section" style="display:none;">
+      <div class="card-select-row">
+        <select id="card-select"></select>
+        <button class="btn" id="analyze-btn">ANALYZE CARD</button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="results-section">
+      <div id="spinner-row" style="display:none;padding:1rem 0;">
+        <span class="spinner"></span> Crunching numbers…
+      </div>
+      <div id="results-inner"></div>
+    </div>
+  </div>
+
+  <script src="/static/nav.js"></script>
+  <script>
+    var state = {
+      results: [],
+      selected: null,
+      analysis: null,
+      variants: [],
+      variantIdx: 0,
+      rawPrices: [],
+    };
+
+    var TYPE_COLORS = {
+      Fire:'#e25822', Water:'#4d9be6', Grass:'#5db85d', Lightning:'#f7d716',
+      Psychic:'#e96bb0', Fighting:'#c04a28', Darkness:'#5a5a8a', Metal:'#9badb7',
+      Dragon:'#7038f8', Fairy:'#f0a0d0', Colorless:'#a8a878',
+    };
+
+    function fmtPrice(v) { return (v != null) ? '$' + parseFloat(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : 'N/A'; }
+
+    function recBadge(rec) {
+      var map = {
+        'Strong Buy':'badge-strong-buy','Buy':'badge-buy','Hold':'badge-hold',
+        'Sell':'badge-sell','Strong Sell':'badge-strong-sell',
+      };
+      return '<span class="badge ' + (map[rec] || 'badge-na') + '">' + (rec || 'N/A') + '</span>';
+    }
+
+    function typeBadges(types) {
+      return (types || []).map(function (t) {
+        return '<span class="type-badge" style="background:' + (TYPE_COLORS[t] || '#555') + ';">' + t + '</span>';
+      }).join('');
+    }
+
+    function signalChips(a) {
+      var chips = [];
+      var trend = a.trend, pct = a.trend_pct_change;
+      if (trend === 'no data') {
+        chips.push('━ Trend: not enough sales history');
+      } else if (trend) {
+        var icon = trend === 'rising' ? '▲' : (trend === 'falling' ? '▼' : '━');
+        var sign = (pct || 0) >= 0 ? '+' : '';
+        chips.push(icon + ' Trend: ' + trend.charAt(0).toUpperCase() + trend.slice(1) +
+          (pct != null ? ' (' + sign + pct.toFixed(1) + '%)' : ''));
+      }
+      if (a.volatility) chips.push('≈ ' + a.volatility.charAt(0).toUpperCase() + a.volatility.slice(1) + ' volatility');
+      if (a.rarity_baseline) chips.push('◈ ' + a.rarity_baseline.charAt(0).toUpperCase() + a.rarity_baseline.slice(1));
+      if (a.popularity_score != null) chips.push('★ Popularity ' + a.popularity_score.toFixed(0) + '/100');
+      if (a.scarcity_score != null) chips.push('⧖ Scarcity ' + a.scarcity_score.toFixed(0) + '/100');
+      if (a.pull_odds_packs != null) chips.push('◈ ~' + a.pull_odds_packs.toFixed(0) + ' packs to pull');
+      return chips.map(function (c) { return '<span class="signal-chip">' + c + '</span>'; }).join('');
+    }
+
+    function renderGauge(score, divId) {
+      if (score == null) return;
+      var barColor = score <= -25 ? '#22c55e' : (score < 25 ? '#eab308' : '#ef4444');
+      Plotly.newPlot(divId, [{
+        type: 'indicator', mode: 'gauge+number',
+        value: score,
+        number: { font: { color: '#FFDE00', size: 26 }, suffix: ' / 100' },
+        gauge: {
+          axis: { range: [-100, 100], tickcolor: '#6b7280', tickfont: { color: '#6b7280', size: 9 } },
+          bar: { color: barColor, thickness: 0.25 },
+          bgcolor: '#1e2035', bordercolor: '#374151', borderwidth: 2,
+          steps: [
+            { range: [-100, -25], color: '#0f2d1a' },
+            { range: [-25,   25], color: '#1c1917' },
+            { range: [  25, 100], color: '#2d0f0f' },
+          ],
+          threshold: { line: { color: '#FFDE00', width: 2 }, thickness: 0.75, value: score },
+        },
+      }], {
+        paper_bgcolor: '#0d0f1a',
+        font: { color: '#e8e8e8', family: 'Inter' },
+        height: 180,
+        margin: { l: 20, r: 20, t: 20, b: 10 },
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    function renderPriceChart(rawPrices, avgPrice) {
+      var chartPrices = rawPrices.slice().reverse();
+      var traces = [{
+        y: chartPrices, mode: 'lines+markers',
+        line: { color: '#FFDE00', width: 2 },
+        marker: { color: '#CC0000', size: 7, line: { color: '#FFDE00', width: 1 } },
+        name: 'Sale Price',
+        hovertemplate: '$%{y:,.2f}<extra></extra>',
+      }];
+      var shapes = [];
+      if (avgPrice) {
+        shapes.push({ type: 'line', x0: 0, x1: 1, xref: 'paper', y0: avgPrice, y1: avgPrice,
+          line: { color: '#6b7280', dash: 'dot', width: 1 } });
+      }
+      Plotly.newPlot('price-chart', traces, {
+        paper_bgcolor: '#0d0f1a', plot_bgcolor: '#161828',
+        font: { color: '#e8e8e8', family: 'Inter' },
+        height: 260,
+        margin: { l: 10, r: 10, t: 20, b: 40 },
+        shapes: shapes,
+        xaxis: { title: 'Sales (oldest → newest)', gridcolor: '#2a2d45', tickfont: { color: '#6b7280' } },
+        yaxis: { tickprefix: '$', gridcolor: '#2a2d45', tickfont: { color: '#6b7280' } },
+        showlegend: false,
+        annotations: avgPrice ? [{
+          x: 1, xref: 'paper', y: avgPrice, yref: 'y',
+          text: 'Avg ' + fmtPrice(avgPrice), showarrow: false,
+          xanchor: 'right', font: { color: '#9ca3af', size: 10 },
+        }] : [],
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    function renderResults(data) {
+      var a = data.analysis;
+      var d = data.details || {};
+      var images = d.images || {};
+      var imgUrl = images.large || images.small || '';
+      var marketPrice = data.market_price || a.average_price;
+
+      var dsHtml = data.data_source === 'live'
+        ? '<span class="badge-live">&#9679; Live TCGPlayer Data</span>'
+        : '<span class="badge-sim">&#9679; Simulated Estimate</span>';
+
+      var html = '<hr>';
+
+      // Variant selector
+      var variants = data.all_variants || [];
+      if (variants.length > 1) {
+        html += '<div class="variant-bar"><label style="margin:0;white-space:nowrap;color:#9ca3af;font-size:0.8rem;">Printing variant</label>' +
+          '<select id="variant-select">' +
+          variants.map(function (v, i) {
+            return '<option value="' + i + '">' + (v.sub_type_name || 'Standard') + '</option>';
+          }).join('') +
+          '</select></div>';
+      }
+
+      // Two-column layout
+      html += '<div class="card-layout">';
+
+      // Image column
+      html += '<div class="card-image">';
+      html += imgUrl
+        ? '<img src="' + imgUrl + '" alt="' + a.card_name + '">'
+        : '<div class="card-no-img">🃏</div>';
+      html += '<div class="psa-box" style="border-color:#22c55e;">' +
+        '<div class="psa-grade" style="color:#22c55e;">NM MARKET PRICE</div>' +
+        '<div class="psa-price" id="nm-price">' + fmtPrice(marketPrice) + '</div>' +
+        '</div></div>';
+
+      // Info column
+      html += '<div>';
+      html += '<h2 style="color:#e8e8e8;">' + a.card_name + '</h2>';
+      html += '<p style="color:#9ca3af;font-size:0.85rem;margin:0.2rem 0 0.6rem;">' +
+        (state.selected ? state.selected.set_name : '') + ' · ' + (d.rarity || '') + '</p>';
+      html += typeBadges(d.types);
+      html += '<br>' + dsHtml;
+      html += '<br><br>' + recBadge(a.recommendation);
+      html += '<br><br><div id="gauge-chart"></div>';
+
+      // Price metrics
+      html += '<div class="metric-row" id="metric-row">' +
+        '<div class="metric-box"><div class="metric-label">Market Price</div><div class="metric-value" id="m-market">' + fmtPrice(data.market_price || a.average_price) + '</div></div>' +
+        '<div class="metric-box"><div class="metric-label">Lowest Ask</div><div class="metric-value" id="m-low">' + fmtPrice(data.low_price || a.lowest_price) + '</div></div>' +
+        '<div class="metric-box"><div class="metric-label">Highest Ask</div><div class="metric-value" id="m-high">' + fmtPrice(data.high_price || a.highest_price) + '</div></div>' +
+        '</div>';
+
+      html += '<div class="signal-row">' + signalChips(a) + '</div>';
+
+      // Signal breakdown
+      var trendStr = (a.trend && a.trend !== 'no data')
+        ? a.trend.charAt(0).toUpperCase() + a.trend.slice(1) +
+          (a.trend_pct_change != null ? ' (' + (a.trend_pct_change >= 0 ? '+' : '') + a.trend_pct_change.toFixed(1) + '%)' : '')
+        : 'Not enough sales history';
+      html += '<details><summary>Full signal breakdown</summary>' +
+        '<div style="margin-top:0.5rem;">' +
+        [
+          ['Trend (last 10 sales)', trendStr],
+          ['Popularity', (a.popularity_score != null ? a.popularity_score.toFixed(1) : 'N/A') + ' / 100'],
+          ['Scarcity (era+rarity)', (a.scarcity_score != null ? a.scarcity_score.toFixed(1) : 'N/A') + ' / 100'],
+          ['Avg packs to pull', a.pull_odds_packs != null ? '~' + a.pull_odds_packs.toFixed(0) + ' packs' : 'N/A'],
+          ['Composite score', a.composite_score != null ? a.composite_score : 'N/A'],
+        ].map(function (r) {
+          return '<div class="detail-row"><div class="detail-label">' + r[0] + '</div><div>' + r[1] + '</div></div>';
+        }).join('') +
+        '</div></details>';
+
+      html += '</div></div>'; // end info col + card-layout
+
+      // Price history
+      if ((data.raw_prices || []).length >= 5) {
+        html += '<hr><h3>Price History</h3><div id="price-chart"></div>';
+      }
+
+      // NM Snapshot table
+      var snap = { low: data.low_price, mid: data.mid_price, market: data.market_price, high: data.high_price };
+      if (snap.low || snap.mid || snap.market || snap.high) {
+        html += '<hr>';
+        html += '<div class="listings-header"><h3 style="margin:0;color:#e8e8e8;font-size:0.8rem;">TCGPlayer NM Price Snapshot</h3>' +
+          '<span class="listings-source-badge">&#9679; Live TCGPlayer</span></div>';
+        var rows = [
+          ['Floor',  'low',    'Cheapest active NM listing',       '#22c55e'],
+          ['Mid',    'mid',    'Median active NM listing',         '#eab308'],
+          ['Market', 'market', 'Weighted avg of recent NM sales',  '#FFDE00'],
+          ['High',   'high',   'Most expensive active NM listing', '#ef4444'],
+        ];
+        html += '<table class="listings-table"><tbody>';
+        rows.forEach(function (r) {
+          var val = snap[r[1]];
+          var priceHtml = val
+            ? '<span style="font-family:\'Press Start 2P\',monospace;font-size:0.72rem;color:' + r[3] + ';">$' + parseFloat(val).toFixed(2) + '</span>'
+            : '<span style="color:#6b7280;">—</span>';
+          html += '<tr><td style="font-weight:600;color:' + r[3] + ';width:80px;">' + r[0] + '</td><td>' + priceHtml + '</td><td style="color:#9ca3af;font-size:0.78rem;">' + r[2] + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        if (data.tcg_url) {
+          html += '<a class="tcg-btn" href="' + data.tcg_url + '" target="_blank">VIEW ALL LISTINGS ON TCGPLAYER &#8599;</a>';
+        }
+      }
+
+      document.getElementById('results-inner').innerHTML = html;
+      document.getElementById('results-section').style.display = 'block';
+
+      // Charts
+      renderGauge(a.composite_score, 'gauge-chart');
+      if ((data.raw_prices || []).length >= 5) {
+        renderPriceChart(data.raw_prices, a.average_price);
+      }
+
+      // Variant switcher
+      state.data = data;
+      var varSel = document.getElementById('variant-select');
+      if (varSel) {
+        varSel.addEventListener('change', function () {
+          var idx = parseInt(this.value);
+          var v = variants[idx];
+          if (!v) return;
+          document.getElementById('nm-price').textContent = fmtPrice(v.market_price || data.market_price);
+          document.getElementById('m-market').textContent = fmtPrice(v.market_price);
+          document.getElementById('m-low').textContent    = fmtPrice(v.low_price);
+          document.getElementById('m-high').textContent   = fmtPrice(v.high_price);
+        });
+      }
+    }
+
+    function doSearch() {
+      var q = document.getElementById('query').value.trim();
+      if (!q) return;
+      document.getElementById('search-msg').innerHTML = '<span class="spinner"></span> Searching…';
+      fetch('/api/search?q=' + encodeURIComponent(q))
+        .then(function (r) { return r.json(); })
+        .then(function (results) {
+          document.getElementById('search-msg').innerHTML = '';
+          if (!results.length) {
+            document.getElementById('search-msg').innerHTML = '<div class="alert alert-warning">No cards found for "' + q + '".</div>';
+            document.getElementById('picker-section').style.display = 'none';
+            return;
+          }
+          state.results = results;
+          var sel = document.getElementById('card-select');
+          sel.innerHTML = results.map(function (c, i) {
+            return '<option value="' + i + '">' + c.name + ' — ' + c.set_name + ' #' + c.number + ' (' + (c.rarity || 'Unknown') + ')</option>';
+          }).join('');
+          state.selected = results[0];
+          document.getElementById('picker-section').style.display = 'block';
+          document.getElementById('results-section').style.display = 'none';
+        })
+        .catch(function () {
+          document.getElementById('search-msg').innerHTML = '<div class="alert alert-error">Search failed. Is the server running?</div>';
+        });
+    }
+
+    function doAnalyze() {
+      var idx = parseInt(document.getElementById('card-select').value);
+      var card = state.results[idx];
+      if (!card) return;
+      state.selected = card;
+      document.getElementById('spinner-row').style.display = 'block';
+      document.getElementById('results-inner').innerHTML = '';
+      document.getElementById('results-section').style.display = 'block';
+      fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card_name: card.name, set_name: card.set_name, number: card.number, card_id: card.set_code + '-' + card.number }),
+      })
+        .then(function (r) {
+          if (!r.ok) return r.json().then(function (e) { throw new Error(e.detail || 'Error'); });
+          return r.json();
+        })
+        .then(function (data) {
+          document.getElementById('spinner-row').style.display = 'none';
+          renderResults(data);
+        })
+        .catch(function (err) {
+          document.getElementById('spinner-row').style.display = 'none';
+          document.getElementById('results-inner').innerHTML = '<div class="alert alert-error">' + err.message + '</div>';
+        });
+    }
+
+    document.getElementById('search-btn').addEventListener('click', doSearch);
+    document.getElementById('query').addEventListener('keydown', function (e) { if (e.key === 'Enter') doSearch(); });
+    document.getElementById('analyze-btn').addEventListener('click', doAnalyze);
+    document.getElementById('card-select').addEventListener('change', function () {
+      state.selected = state.results[parseInt(this.value)];
+    });
+  </script>
+</body>
+</html>
