@@ -229,10 +229,14 @@ function makeLane(row){
       if(obs[i].x<minX) obs[i].x=minX;
     }
   } else {
-    const spd=(50+Math.random()*45)*diff*dir;
+    const baseSpd=(50+Math.random()*45)*diff*dir;
     const logMon=biome.waterMon;
     const logW=(MON_SIZE[logMon]||2)*TILE;
     for(let i=0;i<count;i++){
+      // Each obstacle gets its own speed (±20 % of the lane base).
+      // Different speeds cause them to drift apart then bunch together
+      // periodically, creating natural alignment windows.
+      const spd=baseSpd*(0.80+Math.random()*0.40);
       obs.push({x:i*gap+Math.random()*gap*.3, w:logW, spd, pokemon:logMon});
     }
     obs.sort((a,b)=>a.x-b.x);
