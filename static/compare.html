@@ -4,16 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Compare — PokéValue</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=4">
   <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
   <style>
     .compare-cols { display:grid; grid-template-columns:1fr 1fr; gap:2rem; }
     .compare-col h3 { color:#FFDE00; margin-bottom:0.75rem; }
-    .col-search   { display:flex; gap:0.5rem; margin-bottom:0.5rem; }
+    .col-search { display:flex; gap:0.5rem; margin-bottom:0.5rem; }
     .col-search input { flex:1; }
-    .winner-banner {
-      border-radius:12px; padding:1rem; text-align:center; margin:1.5rem 0;
-    }
+    .winner-banner { border-radius:12px; padding:1rem; text-align:center; margin:1.5rem 0; }
     .winner-label { font-family:'Press Start 2P',monospace; font-size:0.6rem; letter-spacing:.1em; margin-bottom:0.4rem; }
     .winner-name  { font-size:1.4rem; font-weight:700; }
     @media(max-width:700px) { .compare-cols { grid-template-columns:1fr; } }
@@ -54,7 +52,7 @@
     <div id="compare-results" style="display:none;"></div>
   </div>
 
-  <script src="/static/nav.js"></script>
+  <script src="/static/nav.js?v=4"></script>
   <script>
     var TYPE_COLORS = {
       Fire:'#e25822',Water:'#4d9be6',Grass:'#5db85d',Lightning:'#f7d716',
@@ -75,11 +73,11 @@
     }
     function signalChips(a) {
       var chips = [];
-      if (a.trend === 'no data') chips.push('━ Trend: not enough history');
-      else if (a.trend) { var icon = a.trend === 'rising' ? '▲' : (a.trend === 'falling' ? '▼' : '━'); chips.push(icon + ' ' + a.trend); }
-      if (a.volatility) chips.push('≈ ' + a.volatility);
-      if (a.popularity_score != null) chips.push('★ ' + a.popularity_score.toFixed(0) + '/100');
-      if (a.scarcity_score != null)   chips.push('⧖ ' + a.scarcity_score.toFixed(0));
+      if (a.trend === 'no data') chips.push('&#9473; Trend: not enough history');
+      else if (a.trend) { var icon = a.trend === 'rising' ? '&#9650;' : (a.trend === 'falling' ? '&#9660;' : '&#9473;'); chips.push(icon + ' ' + a.trend); }
+      if (a.volatility) chips.push('&#8776; ' + a.volatility);
+      if (a.popularity_score != null) chips.push('&#9733; ' + a.popularity_score.toFixed(0) + '/100');
+      if (a.scarcity_score != null)   chips.push('&#10710; ' + a.scarcity_score.toFixed(0));
       return chips.map(function (c) { return '<span class="signal-chip">' + c + '</span>'; }).join('');
     }
     function scoreColor(s) { return s <= -25 ? '#22c55e' : (s < 25 ? '#eab308' : '#ef4444'); }
@@ -110,13 +108,13 @@
       var low    = data.low_price    || a.lowest_price;
       var high   = data.high_price   || a.highest_price;
       return '<div class="compare-col">' +
-        (imgUrl ? '<img src="' + imgUrl + '" style="width:100%;border-radius:8px;margin-bottom:0.75rem;">' : '<div class="card-no-img" style="height:200px;">🃏</div>') +
+        (imgUrl ? '<img src="' + imgUrl + '" style="width:100%;border-radius:8px;margin-bottom:0.75rem;">' : '<div class="card-no-img" style="height:200px;">&#x1F0CF;</div>') +
         '<strong style="color:#e8e8e8;">' + a.card_name + '</strong>' +
         '<div style="color:#9ca3af;font-size:0.8rem;margin:0.2rem 0 0.5rem;">' + (d.rarity || '') + '</div>' +
         typeBadges(d.types) + '<br>' +
         recBadge(a.recommendation) + '<br><br>' +
         '<div id="gauge-' + suffix + '" style="height:160px;"></div>' +
-        '<div class="metric-row" style="grid-template-columns:1fr 1fr 1fr;">' +
+        '<div class="metric-row">' +
           '<div class="metric-box"><div class="metric-label">Market</div><div class="metric-value">' + fmtPrice(market) + '</div></div>' +
           '<div class="metric-box"><div class="metric-label">Low</div><div class="metric-value">' + fmtPrice(low) + '</div></div>' +
           '<div class="metric-box"><div class="metric-label">High</div><div class="metric-value">' + fmtPrice(high) + '</div></div>' +
@@ -156,9 +154,8 @@
       document.getElementById('compare-results').style.display = 'block';
 
       fetch('/api/compare', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
           card_a:{card_name:cA.name,set_name:cA.set_name,number:cA.number,card_id:cA.set_code+'-'+cA.number},
           card_b:{card_name:cB.name,set_name:cB.set_name,number:cB.number,card_id:cB.set_code+'-'+cB.number},
         }),
@@ -168,28 +165,24 @@
           var a = data.a, b = data.b;
           var sa = a.analysis.composite_score || 0, sb = b.analysis.composite_score || 0;
           var winner = sa < sb ? a.analysis.card_name : (sb < sa ? b.analysis.card_name : 'Tied');
-          var wColor = sa < sb || sb < sa ? '#22c55e' : '#eab308';
+          var wColor = sa !== sb ? '#22c55e' : '#eab308';
 
           var html = '<div class="winner-banner" style="background:' + wColor + '22;border:2px solid ' + wColor + ';">' +
             '<div class="winner-label" style="color:' + wColor + ';">BETTER BUY</div>' +
             '<div class="winner-name">' + winner + '</div></div>';
-
           html += '<div class="compare-cols">' + renderSideCard(a,'a') + renderSideCard(b,'b') + '</div>';
-
-          // Bar chart
-          html += '<hr><h3 style="font-size:0.7rem;color:#aaa;">Score Comparison</h3>';
-          html += '<p style="font-size:0.75rem;color:#9ca3af;margin:0 0 0.5rem;">Negative = undervalued · Positive = overvalued</p>';
+          html += '<hr><h3 style="font-size:0.8rem;color:#aaa;">Score Comparison</h3>';
+          html += '<p style="font-size:0.75rem;color:#9ca3af;margin:0 0 0.5rem;">Negative = undervalued &middot; Positive = overvalued</p>';
           html += '<div id="bar-chart" style="height:280px;"></div>';
 
           document.getElementById('compare-results').innerHTML = html;
-
           makeGauge(sa, 'gauge-a');
           makeGauge(sb, 'gauge-b');
 
           Plotly.newPlot('bar-chart', [{
             type:'bar', x:[a.analysis.card_name, b.analysis.card_name], y:[sa, sb],
             marker:{color:[scoreColor(sa), scoreColor(sb)]},
-            text:[sa >= 0 ? '+' + sa : '' + sa, sb >= 0 ? '+' + sb : '' + sb],
+            text:[sa >= 0 ? '+'+sa : ''+sa, sb >= 0 ? '+'+sb : ''+sb],
             textposition:'outside', textfont:{color:'#e8e8e8',size:14}, width:0.4,
           }], {
             paper_bgcolor:'#0d0f1a', plot_bgcolor:'#161828',
@@ -205,7 +198,7 @@
             showlegend:false,
           }, {responsive:true, displayModeBar:false});
         })
-        .catch(function (e) {
+        .catch(function () {
           document.getElementById('compare-results').innerHTML = '<div class="alert alert-error">Analysis failed. Try different cards.</div>';
         });
     });

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Collection — PokéValue</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=4">
   <style>
     .auth-wrap { max-width:380px; margin:2rem auto; }
     .add-row   { display:flex; gap:0.75rem; margin-bottom:0.75rem; }
@@ -14,9 +14,8 @@
 </head>
 <body>
   <div class="page">
-    <h2 style="text-shadow:2px 2px 0 #000;">My Collection</h2>
+    <h2>My Collection</h2>
 
-    <!-- AUTH SECTION -->
     <div id="auth-section">
       <p style="color:#ccc;margin-bottom:1.5rem;">Create an account or log in to track your cards.</p>
       <div class="auth-tabs">
@@ -40,16 +39,14 @@
       </div>
     </div>
 
-    <!-- LOGGED IN SECTION -->
     <div id="logged-section" style="display:none;">
       <div class="user-bar">
-        <p style="color:#aaa;margin:0;">Logged in as <span id="username-label" style="color:#FFDE00;font-weight:bold;"></span> · <span id="card-count">0</span> cards</p>
+        <p style="color:#aaa;margin:0;">Logged in as <span id="username-label" style="color:#FFDE00;font-weight:bold;"></span> &middot; <span id="card-count">0</span> cards</p>
         <button class="btn" onclick="doLogout()">Log Out</button>
       </div>
       <hr>
 
-      <!-- ADD CARDS -->
-      <h4 style="font-family:'Press Start 2P',monospace;color:#FFDE00;font-size:0.7rem;margin-bottom:0.75rem;">Add Cards</h4>
+      <h4 style="color:#FFDE00;margin-bottom:0.75rem;">Add Cards</h4>
       <div class="add-row">
         <input type="text" id="add-query" placeholder="Search Pokémon card name…">
         <button class="btn" onclick="doAddSearch()">Search</button>
@@ -60,23 +57,19 @@
 
       <hr>
 
-      <!-- COLLECTION GRID -->
-      <h4 style="font-family:'Press Start 2P',monospace;color:#FFDE00;font-size:0.7rem;margin-bottom:0.75rem;">My Cards</h4>
+      <h4 style="color:#FFDE00;margin-bottom:0.75rem;">My Cards</h4>
       <div id="collection-grid" class="collection-grid"></div>
     </div>
   </div>
 
-  <script src="/static/nav.js"></script>
+  <script src="/static/nav.js?v=4"></script>
   <script>
     var CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'Damaged'];
-    var CONDITION_COLORS = { NM:'#4CAF50', LP:'#8BC34A', MP:'#FFC107', HP:'#FF5722', Damaged:'#9E9E9E' };
-    var addResults = [];
-    var user = null;
+    var CONDITION_COLORS = {NM:'#4CAF50',LP:'#8BC34A',MP:'#FFC107',HP:'#FF5722',Damaged:'#9E9E9E'};
+    var addResults = [], user = null;
 
     function saveUser(u) { user = u; localStorage.setItem('pv_user', JSON.stringify(u)); }
-    function loadUser() {
-      try { return JSON.parse(localStorage.getItem('pv_user') || 'null'); } catch (e) { return null; }
-    }
+    function loadUser() { try { return JSON.parse(localStorage.getItem('pv_user') || 'null'); } catch (e) { return null; } }
     function clearUser() { user = null; localStorage.removeItem('pv_user'); }
 
     function switchTab(tab) {
@@ -98,38 +91,30 @@
       msg.innerHTML = '';
       fetch('/api/auth/login', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({username:document.getElementById('l-user').value, password:document.getElementById('l-pass').value}),
+        body:JSON.stringify({username:document.getElementById('l-user').value,password:document.getElementById('l-pass').value}),
       }).then(function (r) {
         if (!r.ok) return r.json().then(function (e) { throw new Error(e.detail); });
         return r.json();
-      }).then(function (u) {
-        saveUser(u); showLoggedIn(u);
-      }).catch(function (e) {
-        msg.innerHTML = '<div class="alert alert-error">' + e.message + '</div>';
-      });
+      }).then(function (u) { saveUser(u); showLoggedIn(u); })
+        .catch(function (e) { msg.innerHTML = '<div class="alert alert-error">' + e.message + '</div>'; });
     }
 
     function doRegister() {
       var msg = document.getElementById('register-msg');
       var pass = document.getElementById('r-pass').value;
-      if (pass !== document.getElementById('r-pass2').value) {
-        msg.innerHTML = '<div class="alert alert-error">Passwords don\'t match.</div>'; return;
-      }
+      if (pass !== document.getElementById('r-pass2').value) { msg.innerHTML = '<div class="alert alert-error">Passwords don\'t match.</div>'; return; }
       fetch('/api/auth/register', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({username:document.getElementById('r-user').value, password:pass}),
+        body:JSON.stringify({username:document.getElementById('r-user').value,password:pass}),
       }).then(function (r) {
         if (!r.ok) return r.json().then(function (e) { throw new Error(e.detail); });
         return r.json();
       }).then(function () {
-        // auto-login after register
         fetch('/api/auth/login', {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({username:document.getElementById('r-user').value, password:pass}),
+          body:JSON.stringify({username:document.getElementById('r-user').value,password:pass}),
         }).then(function (r) { return r.json(); }).then(function (u) { saveUser(u); showLoggedIn(u); });
-      }).catch(function (e) {
-        msg.innerHTML = '<div class="alert alert-error">' + e.message + '</div>';
-      });
+      }).catch(function (e) { msg.innerHTML = '<div class="alert alert-error">' + e.message + '</div>'; });
     }
 
     function doLogout() { clearUser(); location.reload(); }
@@ -148,32 +133,30 @@
             var bgColor = CONDITION_COLORS[c.condition] || '#9E9E9E';
             var img = c.image_url
               ? '<img src="' + c.image_url + '" alt="' + c.card_name + '">'
-              : '<div style="height:140px;background:#1a1a2e;border:1px solid #333;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#555;font-size:0.7rem;">No image</div>';
+              : '<div style="height:140px;background:#0d0f1a;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#555;">No image</div>';
             return '<div class="collection-card">' + img +
               '<div class="collection-card-name">' + c.card_name + '</div>' +
               '<div class="collection-card-set">' + (c.set_name || '') + '</div>' +
               '<div><span class="condition-badge" style="background:' + bgColor + ';">' + c.condition + '</span></div>' +
-              '<button class="btn btn-full" style="margin-top:0.4rem;font-size:0.5rem;padding:0.35rem;" onclick="removeCard(' + c.id + ')">Remove</button>' +
+              '<button class="btn btn-full" style="margin-top:0.4rem;font-size:0.65rem;padding:0.35rem;" onclick="removeCard(' + c.id + ')">Remove</button>' +
               '</div>';
           }).join('');
         });
     }
 
     function removeCard(entryId) {
-      fetch('/api/collection/' + user.id + '/' + entryId, { method:'DELETE' })
-        .then(function () { loadCollection(); });
+      fetch('/api/collection/' + user.id + '/' + entryId, {method:'DELETE'}).then(function () { loadCollection(); });
     }
 
     function doAddSearch() {
       var q = document.getElementById('add-query').value.trim();
       if (!q) return;
-      var msg = document.getElementById('add-msg');
-      msg.innerHTML = '<span class="spinner"></span>';
+      document.getElementById('add-msg').innerHTML = '<span class="spinner"></span>';
       fetch('/api/search?q=' + encodeURIComponent(q))
         .then(function (r) { return r.json(); })
         .then(function (data) {
-          msg.innerHTML = '';
-          if (!data.length) { msg.innerHTML = '<div class="alert alert-warning">No results.</div>'; return; }
+          document.getElementById('add-msg').innerHTML = '';
+          if (!data.length) { document.getElementById('add-msg').innerHTML = '<div class="alert alert-warning">No results.</div>'; return; }
           addResults = data;
           var sel = document.getElementById('add-select');
           sel.style.display = 'block';
@@ -187,13 +170,11 @@
     function renderAddPreview(idx) {
       var c = addResults[idx];
       if (!c) return;
-      var condOpts = CONDITIONS.map(function (cond) {
-        return '<option value="' + cond + '">' + cond + '</option>';
-      }).join('');
+      var condOpts = CONDITIONS.map(function (cond) { return '<option value="' + cond + '">' + cond + '</option>'; }).join('');
       document.getElementById('add-card-preview').innerHTML =
-        '<div style="display:flex;align-items:center;gap:1rem;margin:0.75rem 0;background:#161828;padding:0.75rem;border-radius:8px;border:1px solid #2a2d45;">' +
+        '<div style="display:flex;align-items:center;gap:1rem;margin:0.75rem 0;background:#1a1d30;padding:0.75rem;border-radius:8px;border:1px solid #2a2d45;">' +
         '<div><strong style="color:#FFDE00;">' + c.name + '</strong><br>' +
-        '<span style="color:#9ca3af;font-size:0.8rem;">' + c.set_name + ' · #' + c.number + '</span><br>' +
+        '<span style="color:#9ca3af;font-size:0.8rem;">' + c.set_name + ' &middot; #' + c.number + '</span><br>' +
         '<em style="font-size:0.8rem;color:#6b7280;">' + (c.rarity || 'Unknown rarity') + '</em></div>' +
         '<div style="margin-left:auto;display:flex;align-items:center;gap:0.75rem;">' +
         '<select id="cond-select" style="width:100px;">' + condOpts + '</select>' +
@@ -204,10 +185,9 @@
       var idx = parseInt(document.getElementById('add-select').value || '0');
       var c = addResults[idx];
       if (!c) return;
-      var condition = document.getElementById('cond-select').value;
       fetch('/api/collection/' + user.id + '/add', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({card_name:c.name,set_name:c.set_name,set_code:c.set_code,number:c.number,rarity:c.rarity,condition:condition}),
+        body:JSON.stringify({card_name:c.name,set_name:c.set_name,set_code:c.set_code,number:c.number,rarity:c.rarity,condition:document.getElementById('cond-select').value}),
       }).then(function () {
         document.getElementById('add-select').style.display = 'none';
         document.getElementById('add-card-preview').innerHTML = '<div class="alert alert-success">' + c.name + ' added to your collection!</div>';
@@ -216,12 +196,9 @@
       });
     }
 
-    document.getElementById('add-select').addEventListener('change', function () {
-      renderAddPreview(parseInt(this.value));
-    });
+    document.getElementById('add-select').addEventListener('change', function () { renderAddPreview(parseInt(this.value)); });
     document.getElementById('add-query').addEventListener('keydown', function (e) { if (e.key === 'Enter') doAddSearch(); });
 
-    // Init
     user = loadUser();
     if (user) { showLoggedIn(user); }
   </script>

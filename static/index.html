@@ -4,27 +4,25 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PokéValue — Card Valuation</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body>
   <div class="page">
 
-    <!-- Hero -->
     <section class="home-hero">
       <div class="home-hero-brand">PokéValue</div>
-      <p class="home-hero-sub">Instant Pokémon card valuations · Live TCGPlayer data · Investment signals</p>
+      <p class="home-hero-sub">Instant Pokémon card valuations &middot; Live TCGPlayer data &middot; Investment signals</p>
       <div class="home-search-bar">
         <input type="text" id="home-query" placeholder="Search any Pokémon card… Charizard, Lugia, Pikachu" autofocus>
         <button class="btn" id="home-search-btn">Search</button>
       </div>
       <div class="quick-tiles">
-        <a href="/compare"    class="quick-tile">🆚 Compare Cards</a>
-        <a href="/collection" class="quick-tile">📦 My Collection</a>
-        <a href="/game"       class="quick-tile">⚡ PokéCross</a>
+        <a href="/compare"    class="quick-tile">&#x1F19A; Compare Cards</a>
+        <a href="/collection" class="quick-tile">&#x1F4E6; My Collection</a>
+        <a href="/game"       class="quick-tile">&#9889; PokéCross</a>
       </div>
     </section>
 
-    <!-- Recently analyzed -->
     <section id="recent-section" style="display:none;">
       <h3 style="color:#9ca3af;margin-bottom:0.5rem;">Recently Analyzed</h3>
       <div id="recent-grid" class="recent-grid"></div>
@@ -32,7 +30,7 @@
 
   </div>
 
-  <script src="/static/nav.js"></script>
+  <script src="/static/nav.js?v=4"></script>
   <script>
     var REC_BADGE_MAP = {
       'Strong Buy':'badge-strong-buy','Buy':'badge-buy','Hold':'badge-hold',
@@ -50,7 +48,7 @@
         var badgeCls = REC_BADGE_MAP[c.recommendation] || 'badge-na';
         var imgHtml = c.image_url
           ? '<img src="' + c.image_url + '" alt="' + c.card_name + '">'
-          : '<div class="recent-card-no-img">🃏</div>';
+          : '<div class="recent-card-no-img">&#x1F0CF;</div>';
         return '<a href="/search?q=' + encodeURIComponent(c.card_name) + '" class="recent-card">' +
           imgHtml +
           '<div class="recent-card-name">' + c.card_name + '</div>' +
@@ -70,7 +68,6 @@
 
     document.getElementById('home-search-btn').addEventListener('click', goSearch);
     document.getElementById('home-query').addEventListener('keydown', function (e) { if (e.key === 'Enter') goSearch(); });
-
     loadRecent();
   </script>
 </body>
