@@ -229,14 +229,17 @@ function makeLane(row){
       if(obs[i].x<minX) obs[i].x=minX;
     }
   } else {
-    // All obstacles in a water lane share one speed — prevents overlap.
-    // Cross-lane alignment windows occur naturally because each lane
-    // independently randomises its own speed.
-    const spd=(50+Math.random()*45)*diff*dir;
-    const logMon=biome.waterMon;
-    const logW=(MON_SIZE[logMon]||2)*TILE;
-    for(let i=0;i<count;i++){
-      obs.push({x:i*gap+Math.random()*gap*.3, w:logW, spd, pokemon:logMon});
+    // More Pokémon per lane (3-4) for denser coverage.
+    // Narrower speed range (55-80 px/s) means cross-lane patterns
+    // drift into alignment more frequently.
+    // All share one speed so they never overlap within a lane.
+    const wCount = 3 + Math.floor(Math.random()*2);
+    const wGap   = W / wCount;
+    const spd    = (55 + Math.random()*25)*diff*dir;
+    const logMon = biome.waterMon;
+    const logW   = (MON_SIZE[logMon]||2)*TILE;
+    for(let i=0;i<wCount;i++){
+      obs.push({x:i*wGap+Math.random()*wGap*.3, w:logW, spd, pokemon:logMon});
     }
     obs.sort((a,b)=>a.x-b.x);
     for(let i=1;i<obs.length;i++){
@@ -328,7 +331,14 @@ function kill(){
 }
 function onLand(){
   const ln=lanes[player.row]; if(!ln) return;
-  if(ln.type==='water'&&!logUnder()) { kill(); return; }
+  if(ln.type==='water'){
+    const log=logUnder();
+    if(!log){ kill(); return; }
+    // Snap player to the horizontal centre of the water Pokémon they landed on
+    player.x  = log.x + (log.w - TILE) / 2;
+    player.col = Math.max(0, Math.min(COLS-1, Math.round(player.x / TILE)));
+    return;
+  }
   if(ln.type==='road' &&carHit())    { kill(); return; }
   if(ln.type==='sky'  &&skyHit())    { kill(); return; }
 }
