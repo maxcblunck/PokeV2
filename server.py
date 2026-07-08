@@ -228,34 +228,40 @@ def remove_from_collection(user_id: int, entry_id: int):
 
 # ── Static + page routes ─────────────────────────────────────────────────────
 
+def _page(path: str) -> FileResponse:
+    r = FileResponse(path)
+    r.headers["Cache-Control"] = "no-store"
+    return r
+
+
 @app.get("/")
 def root():
-    return FileResponse("static/index.html")
+    return _page("static/index.html")
 
 
 @app.get("/search")
 def page_search():
-    return FileResponse("static/search.html")
+    return _page("static/search.html")
 
 
 @app.get("/compare")
 def page_compare():
-    return FileResponse("static/compare.html")
+    return _page("static/compare.html")
 
 
 @app.get("/collection")
 def page_collection():
-    return FileResponse("static/collection.html")
+    return _page("static/collection.html")
 
 
 @app.get("/game")
 def page_game():
-    return FileResponse("static/game.html")
+    return _page("static/game.html")
 
 
 @app.get("/game-content")
 def page_game_content():
-    return FileResponse("game.html")
+    return _page("game.html")
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
