@@ -123,8 +123,6 @@ const BIOMES = [
   },
 ];
 
-function getBiomeAt(row){ return BIOMES[Math.floor(row/25)%4]; }
-
 // hidden container keeps GIFs in the DOM so browsers advance their frames
 const sprCache=document.createElement('div');
 sprCache.style.cssText='position:absolute;opacity:0;pointer-events:none;width:0;height:0;overflow:hidden';
@@ -160,14 +158,30 @@ const CHAR_NAMES=['Pikachu','Charmander','Bulbasaur','Squirtle'];
 const CHAR_COLS =['#fbbf24','#f97316','#4ade80','#60a5fa'];
 
 // ── LANE GENERATION ───────────────────────────────────────────
-const SEQ=['grass','road','road','grass','water','water','grass',
-           'road','road','road','grass','water','grass','road',
-           'grass','water','water','water','grass','road','road','grass'];
+// Randomised each game; re-assigned in initGame()
+let curSeq=[], skyInterval=28, biomeZone=25, shuffledBiomes=[];
+
+// State-machine generator: grass → (road|water block of 1-3) → grass → …
+// Guarantees grass always separates road from water.
+function makeRandomSeq(){
+  const result=[], totalLen=22+Math.floor(Math.random()*10);
+  while(result.length<totalLen){
+    const gc=1+Math.floor(Math.random()*2);
+    for(let g=0;g<gc&&result.length<totalLen;g++) result.push('grass');
+    if(result.length>=totalLen) break;
+    const danger=Math.random()<0.55?'road':'water';
+    const dc=1+Math.floor(Math.random()*3);
+    for(let d=0;d<dc&&result.length<totalLen;d++) result.push(danger);
+  }
+  return result;
+}
+
+function getBiomeAt(row){ return shuffledBiomes[Math.floor(row/biomeZone)%shuffledBiomes.length]; }
 
 function laneTypeAt(row){
   if(row<=1) return 'grass';
-  if(row>=30&&(row-30)%28===0) return 'sky';
-  return SEQ[(row-2)%SEQ.length];
+  if(row>=30&&(row-30)%skyInterval===0) return 'sky';
+  return curSeq[(row-2)%curSeq.length];
 }
 function diffAt(row){ return 1+Math.min(row/40,2.5); }
 
@@ -237,6 +251,17 @@ function rowY(r){ return H-TILE-(r-camRow)*TILE; }
 // ── INIT ──────────────────────────────────────────────────────
 function initGame(){
   lanes={}; maxGen=0; score=0; camRow=-BELOW; gameTime=0;
+
+  // Randomise map layout for this run
+  curSeq = makeRandomSeq();
+  skyInterval = 22+Math.floor(Math.random()*12);   // 22-33 rows between sky bosses
+  biomeZone   = 20+Math.floor(Math.random()*16);   // 20-35 rows per biome
+  shuffledBiomes = BIOMES.slice();
+  for(let i=shuffledBiomes.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    const t=shuffledBiomes[i]; shuffledBiomes[i]=shuffledBiomes[j]; shuffledBiomes[j]=t;
+  }
+
   ensureLanes(VIS+6);
   const sc=Math.floor(COLS/2);
   player={col:sc,row:0,x:sc*TILE,fromRow:0,fromX:sc*TILE,moving:false,hopT:0,dead:false};
