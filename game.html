@@ -229,14 +229,13 @@ function makeLane(row){
       if(obs[i].x<minX) obs[i].x=minX;
     }
   } else {
-    const baseSpd=(50+Math.random()*45)*diff*dir;
+    // All obstacles in a water lane share one speed — prevents overlap.
+    // Cross-lane alignment windows occur naturally because each lane
+    // independently randomises its own speed.
+    const spd=(50+Math.random()*45)*diff*dir;
     const logMon=biome.waterMon;
     const logW=(MON_SIZE[logMon]||2)*TILE;
     for(let i=0;i<count;i++){
-      // Each obstacle gets its own speed (±20 % of the lane base).
-      // Different speeds cause them to drift apart then bunch together
-      // periodically, creating natural alignment windows.
-      const spd=baseSpd*(0.80+Math.random()*0.40);
       obs.push({x:i*gap+Math.random()*gap*.3, w:logW, spd, pokemon:logMon});
     }
     obs.sort((a,b)=>a.x-b.x);
@@ -446,23 +445,24 @@ function draw(){
 
 function drawWorld(){
   const r0=Math.floor(camRow)-1, r1=r0+VIS+4;
+
+  // ── Pass 1: backgrounds + terrain (no sprites) ────────────────
+  // Drawing sprites inside this loop meant the next lane's background
+  // rectangle painted over the sprite of the lane below. Two passes fix that.
   for(let r=r0;r<=r1;r++){
     const ln=lanes[r]; if(!ln) continue;
     const sy=Math.round(rowY(r));
     if(sy>H+TILE||sy<-TILE*2) continue;
 
-    // lane bg (biome palette)
     const bm=getBiomeAt(r);
     ctx.fillStyle=bm.pal[ln.type][r&1]; ctx.fillRect(0,sy,W,TILE);
 
-    // lane details (biome-specific)
     if(ln.type==='road'){
       if(bm.roadStyle==='asphalt'){
         ctx.save(); ctx.setLineDash([16,12]);
         ctx.strokeStyle='rgba(251,191,36,0.4)'; ctx.lineWidth=2;
         ctx.beginPath(); ctx.moveTo(0,sy+TILE/2); ctx.lineTo(W,sy+TILE/2); ctx.stroke(); ctx.restore();
       } else if(bm.roadStyle==='seafloor'){
-        // bubble clusters
         ctx.fillStyle='rgba(147,210,255,0.18)';
         for(let b=0;b<6;b++){
           const bx=(r*53+b*97+gameTime*15)%W;
@@ -470,7 +470,6 @@ function drawWorld(){
           const br=2+b%3;
           ctx.beginPath(); ctx.arc(bx,by2,br,0,PI*2); ctx.fill();
         }
-        // seaweed sway
         ctx.strokeStyle='rgba(52,211,153,0.5)'; ctx.lineWidth=2;
         for(let sw=0;sw<3;sw++){
           const swx=(r*41+sw*143)%W;
@@ -479,21 +478,17 @@ function drawWorld(){
           ctx.quadraticCurveTo(swx+sway,sy+TILE/2,swx+sway*0.5,sy+8); ctx.stroke();
         }
       } else if(bm.roadStyle==='lava'){
-        // glowing lava cracks
         ctx.strokeStyle='rgba(251,146,60,0.55)'; ctx.lineWidth=2;
         for(let c2=0;c2<4;c2++){
           const lx=(r*67+c2*111)%W;
           ctx.beginPath(); ctx.moveTo(lx,sy+TILE); ctx.lineTo(lx+12,sy+TILE/2); ctx.lineTo(lx+4,sy+4); ctx.stroke();
         }
-        // lava glow pulse
         const pulse=Math.abs(Math.sin(gameTime*1.8+r))*0.12;
         ctx.fillStyle=`rgba(239,68,68,${pulse})`; ctx.fillRect(0,sy,W,TILE);
       } else if(bm.roadStyle==='highway'){
-        // white lane markers
         ctx.save(); ctx.setLineDash([20,10]);
         ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=2;
         ctx.beginPath(); ctx.moveTo(0,sy+TILE/2); ctx.lineTo(W,sy+TILE/2); ctx.stroke(); ctx.restore();
-        // neon edge lines
         ctx.strokeStyle='rgba(167,139,250,0.35)'; ctx.lineWidth=1;
         ctx.beginPath(); ctx.moveTo(0,sy+4); ctx.lineTo(W,sy+4); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(0,sy+TILE-4); ctx.lineTo(W,sy+TILE-4); ctx.stroke();
@@ -507,7 +502,6 @@ function drawWorld(){
         const wx=(gameTime*30)%(W*2);
         ctx.fillStyle='rgba(96,165,250,0.08)';
         for(let ox=wx-W*2;ox<W+W;ox+=W){ ctx.fillRect(ox,sy+10,W,9); ctx.fillRect(ox,sy+36,W,6); }
-        // bioluminescent dots
         ctx.fillStyle='rgba(52,211,153,0.4)';
         for(let d=0;d<5;d++){
           const dx=(r*73+d*137+gameTime*8)%W;
@@ -516,7 +510,6 @@ function drawWorld(){
           ctx.beginPath(); ctx.arc(dx,dy,glow,0,PI*2); ctx.fill();
         }
       } else if(bm.waterStyle==='magma'){
-        // lava flow bubbles
         const pulse=Math.abs(Math.sin(gameTime*2.5+r));
         ctx.fillStyle=`rgba(251,146,60,${0.1+pulse*0.15})`; ctx.fillRect(0,sy,W,TILE);
         ctx.fillStyle='rgba(239,68,68,0.3)';
@@ -526,7 +519,6 @@ function drawWorld(){
           ctx.beginPath(); ctx.arc(bx,sy+TILE*.6,br,0,PI*2); ctx.fill();
         }
       } else if(bm.waterStyle==='electric_stream'){
-        // electric pulses
         const ex=(gameTime*80)%(W*2);
         ctx.strokeStyle='rgba(167,139,250,0.3)'; ctx.lineWidth=3;
         for(let ox=ex-W*2;ox<W+W;ox+=W*0.5){
@@ -562,9 +554,7 @@ function drawWorld(){
           ctx.beginPath(); ctx.arc(ex,ey,er,0,PI*2); ctx.fill();
         }
       } else if(bm.skyStyle==='storm'){
-        // dark stormclouds tint
         ctx.fillStyle='rgba(15,10,30,0.3)'; ctx.fillRect(0,sy,W,TILE);
-        // lightning flash
         const flash=Math.abs(Math.sin(gameTime*6+r*2));
         if(flash>0.92){
           ctx.fillStyle=`rgba(250,204,21,${(flash-0.92)*8})`; ctx.fillRect(0,sy,W,TILE);
@@ -574,7 +564,15 @@ function drawWorld(){
       if(ln.trees) ln.trees.forEach(col=>drawGroundOb(col,sy,bm));
     }
 
-    // obstacles
+    ctx.fillStyle='rgba(0,0,0,0.22)'; ctx.fillRect(0,sy+TILE-1,W,1);
+  }
+
+  // ── Pass 2: sprites (drawn over all backgrounds) ──────────────
+  for(let r=r0;r<=r1;r++){
+    const ln=lanes[r]; if(!ln) continue;
+    const sy=Math.round(rowY(r));
+    if(sy>H+TILE||sy<-TILE*2) continue;
+
     for(const ob of ln.obs){
       if(ob.x+ob.w<-TILE*2||ob.x>W+TILE*2) continue;
       if     (ln.type==='sky')   drawSkyOb(ob,sy);
@@ -582,7 +580,6 @@ function drawWorld(){
       else if(ln.type==='water') drawWaterOb(ob,sy);
     }
 
-    // sky warning arrow
     if(ln.type==='sky'){
       for(const ob of ln.obs){
         const dir=ob.spd>0?1:-1;
@@ -603,8 +600,6 @@ function drawWorld(){
         }
       }
     }
-
-    ctx.fillStyle='rgba(0,0,0,0.22)'; ctx.fillRect(0,sy+TILE-1,W,1);
   }
 }
 
