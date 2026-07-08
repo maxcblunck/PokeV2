@@ -123,14 +123,18 @@ const BIOMES = [
   },
 ];
 
-// hidden container keeps GIFs in the DOM so browsers advance their frames
+// Off-screen container — keeps GIFs visible to the browser so frames advance.
+// overflow:hidden / width:0 / height:0 stops Chrome from ticking GIF frames,
+// so instead we push the div 600 px to the left of the viewport.
 const sprCache=document.createElement('div');
-sprCache.style.cssText='position:absolute;opacity:0;pointer-events:none;width:0;height:0;overflow:hidden';
+sprCache.style.cssText='position:fixed;left:-600px;top:0;pointer-events:none;display:flex;flex-wrap:wrap;width:580px;';
 document.body.appendChild(sprCache);
 
 const animImgs={}, artImgs={};
 Object.entries(POKEDEX).forEach(([k,id])=>{
-  const g=new Image(); g.crossOrigin='anonymous'; g.src=ANIMATED+id+'.gif';
+  const g=new Image(); g.crossOrigin='anonymous';
+  g.width=48; g.height=48;   // explicit size ensures browser renders & ticks frames
+  g.src=ANIMATED+id+'.gif';
   sprCache.appendChild(g); animImgs[k]=g;
   const a=new Image(); a.crossOrigin='anonymous'; a.src=ART+id+'.png'; artImgs[k]=a;
 });
@@ -609,23 +613,25 @@ function drawRoadOb(ob,sy){
   const flip=ob.spd<0;
   const cx=ob.x+ob.w/2;
   const isSnorlax=ob.pokemon==='snorlax';
+  // bob: each obstacle has its own phase derived from its initial x so they're offset
+  const bob=Math.sin(gameTime*5+ob.x*0.04)*(isSnorlax?2:4);
   drawShadow(cx,sy, isSnorlax?TILE*.7:TILE*.38, isSnorlax?8:5);
   const iw=ob.w*0.9, ih=iw;
   const ix=ob.x+(ob.w-iw)/2;
-  const iy=sy+(TILE-ih)/2;
+  const iy=sy+(TILE-ih)/2+bob;
   drawImg(animImgs[ob.pokemon], ix, iy, iw, ih, flip);
 }
 
 function drawWaterOb(ob,sy){
   const flip=ob.spd<0;
-  // ripple ring on water surface
   const cx=ob.x+ob.w/2;
+  const waveBob=Math.sin(gameTime*1.8+ob.x*0.02)*4;
+  // ripple ring follows the bob
   ctx.strokeStyle='rgba(147,197,253,0.35)'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.ellipse(cx,sy+TILE-10,ob.w*.42,7,0,0,PI*2); ctx.stroke();
-  // animated Lapras floating
+  ctx.beginPath(); ctx.ellipse(cx,sy+TILE-10+waveBob*.3,ob.w*.42,7,0,0,PI*2); ctx.stroke();
   const ih=TILE-4, iw=Math.min(ob.w-8, ih*1.4);
   const ix=ob.x+(ob.w-iw)/2;
-  drawImg(animImgs['lapras'], ix, sy+2, iw, ih, flip);
+  drawImg(animImgs[ob.pokemon], ix, sy+2+waveBob, iw, ih, flip);
 }
 
 // trail colours per sky boss
@@ -634,13 +640,14 @@ const SKY_TRAIL={rayquaza:'rgba(109,40,217,0.18)',lugia:'rgba(96,165,250,0.18)',
 function drawSkyOb(ob,sy){
   const flip=ob.spd<0;
   const boss=ob.pokemon||'rayquaza';
-  // energy trail
+  const skyBob=Math.sin(gameTime*1.2+ob.x*0.008)*6;
+  // energy trail shifts with the bob
   ctx.fillStyle=SKY_TRAIL[boss]||'rgba(109,40,217,0.18)';
   const trailW=ob.w*0.6, trailH=TILE*0.4;
-  ctx.fillRect(ob.x+(ob.w-trailW)/2, sy+(TILE-trailH)/2, trailW, trailH);
+  ctx.fillRect(ob.x+(ob.w-trailW)/2, sy+(TILE-trailH)/2+skyBob, trailW, trailH);
   const ih=TILE*1.6, iw=ob.w*0.75;
   const ix=ob.x+(ob.w-iw)/2;
-  const iy=sy+(TILE-ih)/2;
+  const iy=sy+(TILE-ih)/2+skyBob;
   drawImg(animImgs[boss], ix, iy, iw, ih, flip);
 }
 
