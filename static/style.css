@@ -143,11 +143,22 @@ a  { color: #FFDE00; }
 /* ── Home hero ───────────────────────────────────────────────────────────── */
 .home-hero {
   text-align: center;
-  padding: 3.5rem 2rem 2.5rem;
-  background: linear-gradient(160deg, #14172b 0%, #0d0f1a 100%);
-  border: 1px solid #2a2d45;
-  border-radius: 20px;
+  padding: 3rem 2rem 2.5rem;
+  background: linear-gradient(135deg, #FF8C00 0%, #CC0000 60%, #880000 100%);
+  border: 3px solid #FFDE00;
+  border-radius: 16px;
   margin-bottom: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+.home-hero::before {
+  content: "\26AB";
+  font-size: 26rem;
+  color: rgba(255,255,255,0.04);
+  position: absolute;
+  top: -7rem; right: -7rem;
+  line-height: 1;
+  pointer-events: none;
 }
 .home-hero-brand {
   font-family: 'Press Start 2P', monospace;
@@ -160,7 +171,7 @@ a  { color: #FFDE00; }
 .home-hero-sub {
   font-family: 'Fredoka', sans-serif;
   font-size: 1.1rem;
-  color: #9ca3af;
+  color: rgba(255,255,255,0.88);
   margin-bottom: 2rem;
   font-weight: 400;
 }
