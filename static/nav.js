@@ -60,33 +60,49 @@
   document.getElementById('sidebar-overlay').addEventListener('click', closeSidebar);
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSidebar(); });
 
-  /* ── Random Pokémon background sprites ───────────────────────────── */
+  /* ── Falling Pokémon background sprites ──────────────────────────── */
   (function () {
+    var style = document.createElement('style');
+    style.textContent =
+      '@keyframes pv-fall {' +
+        'from { transform: translateY(0); }' +
+        'to   { transform: translateY(calc(100vh + 160px)); }' +
+      '}';
+    document.head.appendChild(style);
+
     var bg = document.createElement('div');
     bg.style.cssText = 'position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;';
 
+    // Shuffle Gen-1 dex numbers so every load picks different Pokémon
     var pool = [];
     for (var n = 1; n <= 151; n++) pool.push(n);
-    // Fisher-Yates shuffle
     for (var i = pool.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
       var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
     }
 
-    var count = 18;
+    var count = 22;
     for (var k = 0; k < count; k++) {
-      var dex  = pool[k];
-      var size = 60 + Math.floor(Math.random() * 60);       // 60–120 px
-      var op   = (0.04 + Math.random() * 0.04).toFixed(3);  // 0.04–0.08
-      var x    = (Math.random() * 93).toFixed(1);           // % left
-      var y    = (Math.random() * 93).toFixed(1);           // % top
-      var img  = document.createElement('img');
-      img.src  = SPRITE + dex + '.png';
-      img.alt  = '';
+      var dex      = pool[k];
+      var size     = 56 + Math.floor(Math.random() * 64);        // 56–120 px
+      var op       = (0.15 + Math.random() * 0.15).toFixed(3);   // 0.15–0.30
+      var x        = (Math.random() * 94).toFixed(1);             // % left
+      var dur      = (7 + Math.random() * 8).toFixed(1);          // 7–15 s fall
+      // Negative delay starts the sprite mid-fall so screen is full immediately
+      var delay    = (-Math.random() * parseFloat(dur)).toFixed(2);
+
+      var img = document.createElement('img');
+      img.src = SPRITE + dex + '.png';
+      img.alt = '';
       img.style.cssText =
-        'position:absolute;left:' + x + '%;top:' + y + '%;' +
-        'width:' + size + 'px;height:' + size + 'px;' +
-        'opacity:' + op + ';image-rendering:pixelated;';
+        'position:absolute;' +
+        'left:' + x + '%;' +
+        'top:-140px;' +
+        'width:' + size + 'px;' +
+        'height:' + size + 'px;' +
+        'opacity:' + op + ';' +
+        'image-rendering:pixelated;' +
+        'animation:pv-fall ' + dur + 's ' + delay + 's linear infinite;';
       bg.appendChild(img);
     }
 
