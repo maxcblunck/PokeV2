@@ -274,7 +274,7 @@ function initGame(){
 
   ensureLanes(VIS+6);
   const sc=Math.floor(COLS/2);
-  player={col:sc,row:0,x:sc*TILE,fromRow:0,fromX:sc*TILE,moving:false,hopT:0,dead:false};
+  player={col:sc,row:0,x:sc*TILE,fromRow:0,fromX:sc*TILE,moving:false,hopT:0,dead:false,snapT:1,snapOffset:0,snapDur:0.18};
 }
 
 // ── MOVEMENT ──────────────────────────────────────────────────
@@ -334,9 +334,9 @@ function onLand(){
   if(ln.type==='water'){
     const log=logUnder();
     if(!log){ kill(); return; }
-    // Snap player to the horizontal centre of the water Pokémon they landed on
-    player.x  = log.x + (log.w - TILE) / 2;
-    player.col = Math.max(0, Math.min(COLS-1, Math.round(player.x / TILE)));
+    // Record offset from centre at landing; update() eases it to zero
+    player.snapOffset = player.x - (log.x + (log.w - TILE) / 2);
+    player.snapT      = 0;
     return;
   }
   if(ln.type==='road' &&carHit())    { kill(); return; }
@@ -373,7 +373,13 @@ function update(ts){
     const ln=lanes[player.row];
     if(ln&&ln.type==='water'){
       const log=logUnder(); if(!log){ kill(); return; }
-      player.x+=log.spd*dt;
+      if(player.snapT < 1){
+        // Ease the landing offset to zero while the log moves underneath
+        player.snapT = Math.min(1, player.snapT + dt / player.snapDur);
+        player.x = log.x + (log.w - TILE) / 2 + player.snapOffset * (1 - easeIO(player.snapT));
+      } else {
+        player.x += log.spd * dt;
+      }
       player.col=Math.max(0,Math.min(COLS-1,Math.round(player.x/TILE)));
       if(player.x<-TILE*.4||player.x>W-TILE*.6){ kill(); return; }
     }
