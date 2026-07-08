@@ -12,12 +12,6 @@
     .variant-bar { margin:0.75rem 0; display:flex; align-items:center; gap:0.75rem; }
     .variant-bar select { flex:1; }
     #results-section { display:none; margin-top:1.5rem; }
-    .tcg-btn {
-      display:inline-block; margin-top:0.8rem;
-      font-family:'Press Start 2P',monospace; font-size:0.6rem;
-      color:#FFDE00; background:#CC0000; border:2px solid #FFDE00;
-      border-radius:6px; padding:0.5rem 1rem; text-decoration:none;
-    }
   </style>
 </head>
 <body>
@@ -339,6 +333,7 @@
         .then(function (data) {
           document.getElementById('spinner-row').style.display = 'none';
           renderResults(data);
+          saveRecent(data, card);
         })
         .catch(function (err) {
           document.getElementById('spinner-row').style.display = 'none';
@@ -352,6 +347,30 @@
     document.getElementById('card-select').addEventListener('change', function () {
       state.selected = state.results[parseInt(this.value)];
     });
+
+    function saveRecent(data, card) {
+      var item = {
+        card_name: data.analysis.card_name,
+        set_name:  card.set_name,
+        number:    card.number,
+        image_url: (data.details.images || {}).small || '',
+        market_price:   data.market_price || data.analysis.average_price,
+        recommendation: data.analysis.recommendation,
+      };
+      try {
+        var recent = JSON.parse(localStorage.getItem('pv_recent') || '[]');
+        recent = recent.filter(function (r) { return !(r.card_name === item.card_name && r.set_name === item.set_name); });
+        recent.unshift(item);
+        localStorage.setItem('pv_recent', JSON.stringify(recent.slice(0, 5)));
+      } catch (e) {}
+    }
+
+    // Auto-trigger from URL ?q= param (e.g. clicking a card from home page)
+    var urlQ = new URLSearchParams(window.location.search).get('q');
+    if (urlQ) {
+      document.getElementById('query').value = urlQ;
+      doSearch();
+    }
   </script>
 </body>
 </html>

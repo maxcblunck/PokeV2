@@ -2,8 +2,77 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0;url=/popularity">
-  <title>PokéValue</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PokéValue — Card Valuation</title>
+  <link rel="stylesheet" href="/static/style.css">
 </head>
-<body></body>
+<body>
+  <div class="page">
+
+    <!-- Hero -->
+    <section class="home-hero">
+      <div class="home-hero-brand">PokéValue</div>
+      <p class="home-hero-sub">Instant Pokémon card valuations · Live TCGPlayer data · Investment signals</p>
+      <div class="home-search-bar">
+        <input type="text" id="home-query" placeholder="Search any Pokémon card… Charizard, Lugia, Pikachu" autofocus>
+        <button class="btn" id="home-search-btn">Search</button>
+      </div>
+      <div class="quick-tiles">
+        <a href="/compare"    class="quick-tile">🆚 Compare Cards</a>
+        <a href="/collection" class="quick-tile">📦 My Collection</a>
+        <a href="/popularity" class="quick-tile">🌟 Rankings</a>
+        <a href="/game"       class="quick-tile">⚡ PokéCross</a>
+      </div>
+    </section>
+
+    <!-- Recently analyzed -->
+    <section id="recent-section" style="display:none;">
+      <h3 style="color:#9ca3af;margin-bottom:0.5rem;">Recently Analyzed</h3>
+      <div id="recent-grid" class="recent-grid"></div>
+    </section>
+
+  </div>
+
+  <script src="/static/nav.js"></script>
+  <script>
+    var REC_BADGE_MAP = {
+      'Strong Buy':'badge-strong-buy','Buy':'badge-buy','Hold':'badge-hold',
+      'Sell':'badge-sell','Strong Sell':'badge-strong-sell',
+    };
+    function fmtPrice(v) { return v != null ? '$' + parseFloat(v).toFixed(2) : null; }
+
+    function loadRecent() {
+      var recent = [];
+      try { recent = JSON.parse(localStorage.getItem('pv_recent') || '[]'); } catch (e) {}
+      if (!recent.length) return;
+      var grid = document.getElementById('recent-grid');
+      grid.innerHTML = recent.map(function (c) {
+        var price = fmtPrice(c.market_price);
+        var badgeCls = REC_BADGE_MAP[c.recommendation] || 'badge-na';
+        var imgHtml = c.image_url
+          ? '<img src="' + c.image_url + '" alt="' + c.card_name + '">'
+          : '<div class="recent-card-no-img">🃏</div>';
+        return '<a href="/search?q=' + encodeURIComponent(c.card_name) + '" class="recent-card">' +
+          imgHtml +
+          '<div class="recent-card-name">' + c.card_name + '</div>' +
+          '<div class="recent-card-set">' + (c.set_name || '') + '</div>' +
+          (price ? '<div class="recent-card-price">' + price + '</div>' : '') +
+          '<div style="margin-top:0.3rem;"><span class="badge ' + badgeCls + '" style="font-size:0.58rem;padding:2px 7px;">' + (c.recommendation || '—') + '</span></div>' +
+          '</a>';
+      }).join('');
+      document.getElementById('recent-section').style.display = 'block';
+    }
+
+    function goSearch() {
+      var q = document.getElementById('home-query').value.trim();
+      if (!q) return;
+      window.location.href = '/search?q=' + encodeURIComponent(q);
+    }
+
+    document.getElementById('home-search-btn').addEventListener('click', goSearch);
+    document.getElementById('home-query').addEventListener('keydown', function (e) { if (e.key === 'Enter') goSearch(); });
+
+    loadRecent();
+  </script>
+</body>
 </html>
