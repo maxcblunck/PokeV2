@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Press+Start+2P&family=Inter:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;600;700&family=Press+Start+2P&display=swap');
 
 /* ── Reset & base ────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
@@ -7,10 +7,10 @@ body {
   padding-top: 56px;
   background: #0d0f1a;
   color: #e8e8e8;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Nunito', sans-serif;
 }
 h1, h2, h3, h4 {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-weight: 700;
   margin-top: 0;
 }
@@ -112,7 +112,7 @@ a  { color: #FFDE00; }
   padding: 0.9rem 1.5rem;
   color: #9ca3af;
   text-decoration: none;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-size: 0.95rem;
   font-weight: 600;
   border-left: 3px solid transparent;
@@ -158,7 +158,7 @@ a  { color: #FFDE00; }
   letter-spacing: 2px;
 }
 .home-hero-sub {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-size: 1.1rem;
   color: #9ca3af;
   margin-bottom: 2rem;
@@ -178,7 +178,7 @@ a  { color: #FFDE00; }
   flex-wrap: wrap;
 }
 .quick-tile {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-size: 0.9rem;
   font-weight: 600;
   color: #9ca3af;
@@ -229,7 +229,7 @@ a  { color: #FFDE00; }
   font-size: 2rem;
 }
 .recent-card-name {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-size: 0.72rem;
   font-weight: 600;
   color: #FFDE00;
@@ -239,7 +239,7 @@ a  { color: #FFDE00; }
   white-space: nowrap;
 }
 .recent-card-price {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-size: 0.78rem;
   font-weight: 700;
   color: #e8e8e8;
@@ -260,7 +260,7 @@ a  { color: #FFDE00; }
 /* ── Recommendation badges ───────────────────────────────────────────────── */
 .badge {
   display: inline-block;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-size: 0.72rem;
   font-weight: 700;
   padding: 0.35rem 0.85rem;
@@ -308,7 +308,7 @@ a  { color: #FFDE00; }
   margin-top: 1rem;
 }
 .psa-grade {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-size: 0.72rem;
   font-weight: 700;
   color: #a78bfa;
@@ -316,7 +316,7 @@ a  { color: #FFDE00; }
   letter-spacing: 0.5px;
 }
 .psa-price {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-size: 1.4rem;
   font-weight: 700;
   color: #FFDE00;
@@ -336,7 +336,7 @@ a  { color: #FFDE00; }
   padding: 1.1rem;
   text-align: center;
 }
-.stat-val { font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 700; color: #FFDE00; }
+.stat-val { font-family: 'Fredoka', sans-serif; font-size: 1.5rem; font-weight: 700; color: #FFDE00; }
 .stat-lbl { font-size: 0.72rem; color: #9ca3af; margin-top: 0.3rem; letter-spacing: 0.5px; }
 
 /* ── Popularity grid ─────────────────────────────────────────────────────── */
@@ -368,7 +368,7 @@ a  { color: #FFDE00; }
   font-size: 1.5rem;
 }
 .pop-name {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-size: 0.6rem;
   font-weight: 700;
   color: #FFDE00;
@@ -383,7 +383,7 @@ a  { color: #FFDE00; }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
 .btn {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-size: 0.85rem;
   font-weight: 700;
   background: #CC0000;
@@ -409,7 +409,7 @@ select {
   border: 1px solid #2a2d45;
   color: #e8e8e8;
   border-radius: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Nunito', sans-serif;
   font-size: 0.9rem;
   padding: 0.55rem 0.85rem;
   width: 100%;
@@ -440,7 +440,7 @@ label { font-size: 0.8rem; color: #9ca3af; display: block; margin-bottom: 0.3rem
   text-align: center;
 }
 .metric-label { font-size: 0.7rem; color: #9ca3af; margin-bottom: 0.3rem; }
-.metric-value { font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: #FFDE00; }
+.metric-value { font-family: 'Fredoka', sans-serif; font-size: 1rem; font-weight: 700; color: #FFDE00; }
 
 /* ── Card layout (search result) ─────────────────────────────────────────── */
 .card-layout {
@@ -510,7 +510,7 @@ details {
   padding: 0.75rem 1rem;
   margin: 0.75rem 0;
 }
-summary { cursor: pointer; color: #FFDE00; font-size: 0.85rem; font-family: 'Outfit', sans-serif; font-weight: 600; }
+summary { cursor: pointer; color: #FFDE00; font-size: 0.85rem; font-family: 'Fredoka', sans-serif; font-weight: 600; }
 .detail-row {
   display: grid;
   grid-template-columns: 1fr 2fr;
@@ -556,7 +556,7 @@ summary { cursor: pointer; color: #FFDE00; font-size: 0.85rem; font-family: 'Out
 }
 .collection-card img { width: 100%; border-radius: 6px; }
 .collection-card-name {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-size: 0.7rem;
   font-weight: 600;
   color: #FFDE00;
@@ -581,7 +581,7 @@ summary { cursor: pointer; color: #FFDE00; font-size: 0.85rem; font-family: 'Out
 .auth-tab {
   padding: 0.5rem 1.5rem;
   cursor: pointer;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-size: 0.85rem;
   font-weight: 600;
   color: #9ca3af;
@@ -608,7 +608,7 @@ summary { cursor: pointer; color: #FFDE00; font-size: 0.85rem; font-family: 'Out
 .tcg-btn {
   display: inline-block;
   margin-top: 0.8rem;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Fredoka', sans-serif;
   font-size: 0.78rem;
   font-weight: 700;
   color: #FFDE00;

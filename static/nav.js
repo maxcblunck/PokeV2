@@ -4,7 +4,6 @@
     { href: '/search',     label: '🔍 Card Search' },
     { href: '/compare',    label: '🆚 Compare' },
     { href: '/collection', label: '📦 Collection' },
-    { href: '/popularity', label: '🌟 Rankings' },
     { href: '/game',       label: '⚡ PokéCross' },
   ];
 

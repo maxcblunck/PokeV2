@@ -233,11 +233,6 @@ def root():
     return FileResponse("static/index.html")
 
 
-@app.get("/popularity")
-def page_popularity():
-    return FileResponse("static/popularity.html")
-
-
 @app.get("/search")
 def page_search():
     return FileResponse("static/search.html")
