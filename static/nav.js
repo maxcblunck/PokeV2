@@ -1,10 +1,11 @@
 (function () {
+  var SPRITE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
   var links = [
-    { href: '/',           label: '🏠 Home' },
-    { href: '/search',     label: '🔍 Card Search' },
-    { href: '/compare',    label: '🆚 Compare' },
-    { href: '/collection', label: '📦 Collection' },
-    { href: '/game',       label: '⚡ PokéCross' },
+    { href: '/',           pokemon: 1,   label: 'Home' },
+    { href: '/search',     pokemon: 52,  label: 'Card Search' },
+    { href: '/compare',    pokemon: 106, label: 'Compare' },
+    { href: '/collection', pokemon: 133, label: 'Collection' },
+    { href: '/game',       pokemon: 25,  label: 'PokéCross' },
   ];
 
   var path = window.location.pathname;
@@ -16,7 +17,7 @@
     '<button class="hamburger" id="hamburger" aria-label="Open menu">' +
       '<span></span><span></span><span></span>' +
     '</button>' +
-    '<a class="site-logo" href="/">PokéValue</a>';
+    '<a class="site-logo" href="/">Pok&eacute;Value</a>';
 
   /* ── Sidebar ─────────────────────────────────────────────────────── */
   var sidebar = document.createElement('nav');
@@ -24,11 +25,14 @@
   sidebar.id = 'sidebar';
   sidebar.innerHTML =
     '<div class="sidebar-header">' +
-      '<span class="sidebar-title">PokéValue</span>' +
-      '<button class="sidebar-close" id="sidebar-close">✕</button>' +
+      '<span class="sidebar-title">Pok&eacute;Value</span>' +
+      '<button class="sidebar-close" id="sidebar-close">&#x2715;</button>' +
     '</div>' +
     links.map(function (l) {
-      return '<a href="' + l.href + '" class="sidebar-link' + (path === l.href ? ' active' : '') + '">' + l.label + '</a>';
+      var active = path === l.href ? ' active' : '';
+      var img = '<img src="' + SPRITE + l.pokemon + '.png" alt="" ' +
+                'style="width:30px;height:30px;image-rendering:pixelated;flex-shrink:0;">';
+      return '<a href="' + l.href + '" class="sidebar-link' + active + '">' + img + l.label + '</a>';
     }).join('');
 
   /* ── Overlay ─────────────────────────────────────────────────────── */
