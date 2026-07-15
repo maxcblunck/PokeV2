@@ -5,6 +5,7 @@
     { href: '/search',     pokemon: 52,  label: 'Card Search' },
     { href: '/compare',    pokemon: 106, label: 'Compare' },
     { href: '/collection', pokemon: 133, label: 'Collection' },
+    { href: '/portfolio',  pokemon: 6,   label: 'Portfolio' },
     { href: '/game',       pokemon: 25,  label: 'PokéCross' },
   ];
 

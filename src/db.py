@@ -38,6 +38,17 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                snapshot_date TEXT NOT NULL,
+                total_value REAL NOT NULL,
+                card_count INTEGER DEFAULT 0,
+                UNIQUE(user_id, snapshot_date),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
         conn.commit()
 
 
@@ -122,3 +133,30 @@ def remove_from_collection(user_id: int, entry_id: int):
             (entry_id, user_id),
         )
         conn.commit()
+
+
+def record_snapshot(user_id: int, total_value: float, card_count: int) -> None:
+    """Record (or overwrite) today's portfolio value snapshot for a user."""
+    with _get_conn() as conn:
+        conn.execute(
+            """INSERT INTO portfolio_snapshots (user_id, snapshot_date, total_value, card_count)
+               VALUES (?, date('now'), ?, ?)
+               ON CONFLICT(user_id, snapshot_date)
+               DO UPDATE SET total_value = excluded.total_value,
+                             card_count  = excluded.card_count""",
+            (user_id, round(total_value, 2), card_count),
+        )
+        conn.commit()
+
+
+def get_snapshots(user_id: int) -> list[dict]:
+    """Return a user's value-over-time snapshots, oldest first."""
+    with _get_conn() as conn:
+        rows = conn.execute(
+            """SELECT snapshot_date, total_value, card_count
+               FROM portfolio_snapshots
+               WHERE user_id = ?
+               ORDER BY snapshot_date ASC""",
+            (user_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]

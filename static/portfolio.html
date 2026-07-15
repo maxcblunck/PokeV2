@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio — PokéValue</title>
+  <link rel="stylesheet" href="/static/style.css?v=8">
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <style>
+    .verdict-hero { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; margin-bottom:1.25rem; }
+    .chip-row { display:flex; flex-wrap:wrap; gap:0.5rem; margin:0.5rem 0 1.25rem; }
+    .sig-chip { font-size:0.72rem; font-weight:700; padding:0.35rem 0.7rem; border-radius:999px; border:1px solid #2a2d45; }
+    .highlight-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+    .highlight-box { background:#1a1d30; border:1px solid #2a2d45; border-radius:10px; padding:0.9rem; }
+    .highlight-box h5 { margin:0 0 0.5rem; color:#9ca3af; font-size:0.68rem; letter-spacing:0.5px; text-transform:uppercase; }
+    .highlight-box .hl-name { color:#FFDE00; font-weight:700; font-size:0.95rem; }
+    .highlight-box .hl-sub { color:#9ca3af; font-size:0.75rem; }
+    .pf-card .pf-val { color:#FFDE00; font-weight:700; font-size:0.85rem; margin-top:0.25rem; }
+    .pf-card .pf-score { font-size:0.62rem; color:#9ca3af; }
+    #chart-wrap { background:#1a1d30; border:1px solid #2a2d45; border-radius:10px; padding:0.5rem; margin-bottom:1.5rem; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h2>My Portfolio</h2>
+
+    <div id="guest-section">
+      <div class="alert alert-info" style="margin-top:1rem;">
+        Please <a href="/collection" style="color:#FFDE00;">log in on the Collection page</a> to view your portfolio.
+      </div>
+    </div>
+
+    <div id="portfolio-section" style="display:none;">
+      <div class="stat-row" id="stat-row"></div>
+
+      <div class="verdict-hero" id="verdict-hero">
+        <button class="btn" id="value-btn" onclick="valuePortfolio()">💰 Value My Portfolio</button>
+        <span id="value-status" style="color:#9ca3af;font-size:0.85rem;"></span>
+      </div>
+
+      <div class="chip-row" id="chip-row" style="display:none;"></div>
+      <div class="highlight-row" id="highlight-row" style="display:none;"></div>
+      <div id="chart-wrap" style="display:none;"><div id="value-chart" style="height:280px;"></div></div>
+
+      <h4 style="color:#FFDE00;margin-bottom:0.75rem;">Holdings</h4>
+      <div id="pf-grid" class="collection-grid"></div>
+    </div>
+  </div>
+
+  <script src="/static/nav.js?v=8"></script>
+  <script>
+    var CONDITION_COLORS = {NM:'#4CAF50',LP:'#8BC34A',MP:'#FFC107',HP:'#FF5722',Damaged:'#9E9E9E'};
+    var user = null;
+
+    function loadUser() { try { return JSON.parse(localStorage.getItem('pv_user') || 'null'); } catch (e) { return null; } }
+
+    function badgeClass(rec) {
+      return {
+        'Strong Buy':'badge-strong-buy','Buy':'badge-buy','Hold':'badge-hold',
+        'Sell':'badge-sell','Strong Sell':'badge-strong-sell',
+      }[rec] || 'badge-na';
+    }
+    function chipStyle(bucket) {
+      var c = {
+        'Strong Buy':'#22c55e','Buy':'#eab308','Hold':'#6b7280',
+        'Sell':'#f97316','Strong Sell':'#ef4444',
+      }[bucket] || '#374151';
+      return 'color:' + c + ';border-color:' + c + ';';
+    }
+    function money(v) { return v == null ? '—' : '$' + Number(v).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+    function statBox(val, lbl) {
+      return '<div class="stat-box"><div class="stat-val">' + val + '</div><div class="stat-lbl">' + lbl + '</div></div>';
+    }
+
+    function renderCards(cards, valued) {
+      var grid = document.getElementById('pf-grid');
+      if (!cards.length) {
+        grid.innerHTML = '<p style="color:#888;text-align:center;padding:2rem;grid-column:1/-1;">No cards yet — add some on the <a href="/collection" style="color:#FFDE00;">Collection page</a>.</p>';
+        return;
+      }
+      grid.innerHTML = cards.map(function (c) {
+        var name = c.card_name;
+        var setName = c.set_name || '';
+        var cond = c.condition || 'NM';
+        var bg = CONDITION_COLORS[cond] || '#9E9E9E';
+        var img = c.image_url
+          ? '<img src="' + c.image_url + '" alt="' + name + '">'
+          : '<div style="height:140px;background:#0d0f1a;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#555;">No image</div>';
+        var valLine = '', scoreLine = '';
+        if (valued) {
+          valLine = '<div class="pf-val">' + money(c.value) + '</div>';
+          if (c.recommendation && c.recommendation !== 'Insufficient Data') {
+            scoreLine = '<div class="pf-score">' + c.recommendation +
+              (c.composite_score != null ? ' (' + c.composite_score + ')' : '') + '</div>';
+          } else {
+            scoreLine = '<div class="pf-score">No price data</div>';
+          }
+        }
+        return '<div class="collection-card pf-card">' + img +
+          '<div class="collection-card-name">' + name + '</div>' +
+          '<div class="collection-card-set">' + setName + '</div>' +
+          '<div><span class="condition-badge" style="background:' + bg + ';">' + cond + '</span></div>' +
+          valLine + scoreLine +
+          '</div>';
+      }).join('');
+    }
+
+    function renderChart(history) {
+      var wrap = document.getElementById('chart-wrap');
+      if (!history || history.length < 2) { wrap.style.display = 'none'; return; }
+      wrap.style.display = 'block';
+      Plotly.newPlot('value-chart', [{
+        x: history.map(function (h) { return h.snapshot_date; }),
+        y: history.map(function (h) { return h.total_value; }),
+        type: 'scatter', mode: 'lines+markers',
+        line: { color: '#FFDE00', width: 3 },
+        marker: { color: '#FFDE00', size: 7 },
+        fill: 'tozeroy', fillcolor: 'rgba(255,222,0,0.08)',
+        hovertemplate: '%{x}<br>$%{y:,.2f}<extra></extra>',
+      }], {
+        paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+        font: { color: '#9ca3af', size: 11 },
+        margin: { l: 60, r: 20, t: 20, b: 40 },
+        title: { text: 'Portfolio Value Over Time', font: { color: '#FFDE00', size: 14 } },
+        xaxis: { gridcolor: '#2a2d45' },
+        yaxis: { gridcolor: '#2a2d45', tickprefix: '$' },
+      }, { displayModeBar: false, responsive: true });
+    }
+
+    function hlBox(title, c) {
+      if (!c) return '';
+      return '<div class="highlight-box"><h5>' + title + '</h5>' +
+        '<div class="hl-name">' + c.card_name + '</div>' +
+        '<div class="hl-sub">' + (c.set_name || '') + '</div>' +
+        '<div style="margin-top:0.5rem;">' + money(c.value) +
+        ' &middot; <span class="badge ' + badgeClass(c.recommendation) + '" style="font-size:0.6rem;padding:0.2rem 0.5rem;">' +
+        c.recommendation + '</span></div></div>';
+    }
+
+    function loadPortfolio() {
+      fetch('/api/portfolio/' + user.id)
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          document.getElementById('stat-row').innerHTML =
+            statBox(data.stats.card_count, 'CARDS') +
+            statBox(data.stats.set_count, 'SETS') +
+            statBox('—', 'TOTAL VALUE') +
+            statBox('—', 'VERDICT');
+          renderCards(data.cards, false);
+          renderChart(data.history);
+        });
+    }
+
+    function valuePortfolio() {
+      var btn = document.getElementById('value-btn');
+      btn.disabled = true;
+      document.getElementById('value-status').innerHTML = '<span class="spinner"></span> Valuing cards — this may take a moment…';
+      fetch('/api/portfolio/' + user.id + '/value', { method: 'POST' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          btn.disabled = false;
+          document.getElementById('value-status').textContent =
+            data.stats.priced_count + ' of ' + data.stats.card_count + ' cards priced';
+
+          document.getElementById('stat-row').innerHTML =
+            statBox(data.stats.card_count, 'CARDS') +
+            statBox(new Set(data.cards.map(function (c) { return c.set_name; })).size, 'SETS') +
+            statBox(money(data.stats.total_value), 'TOTAL VALUE') +
+            statBox('<span class="badge ' + badgeClass(data.stats.overall_verdict) + '" style="font-size:0.8rem;">' + data.stats.overall_verdict + '</span>', 'VERDICT');
+
+          var order = ['Strong Buy','Buy','Hold','Sell','Strong Sell','No Data'];
+          var chips = order.filter(function (b) { return data.buckets[b]; }).map(function (b) {
+            return '<span class="sig-chip" style="' + chipStyle(b) + '">' + b + ': ' + data.buckets[b] + '</span>';
+          }).join('');
+          var chipRow = document.getElementById('chip-row');
+          chipRow.innerHTML = chips; chipRow.style.display = chips ? 'flex' : 'none';
+
+          var h = data.highlights;
+          var hlRow = document.getElementById('highlight-row');
+          hlRow.innerHTML = hlBox('Most Valuable', h.most_valuable) +
+                            hlBox('Best Buy Signal', h.best_buy) +
+                            hlBox('Consider Selling', h.top_sell);
+          hlRow.style.display = hlRow.innerHTML ? 'grid' : 'none';
+
+          renderCards(data.cards, true);
+          renderChart(data.history);
+        })
+        .catch(function () {
+          btn.disabled = false;
+          document.getElementById('value-status').innerHTML = '<span style="color:#ef4444;">Valuation failed — try again.</span>';
+        });
+    }
+
+    user = loadUser();
+    if (user) {
+      document.getElementById('guest-section').style.display = 'none';
+      document.getElementById('portfolio-section').style.display = 'block';
+      loadPortfolio();
+    }
+  </script>
+</body>
+</html>

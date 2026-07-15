@@ -226,6 +226,140 @@ def remove_from_collection(user_id: int, entry_id: int):
     return {"ok": True}
 
 
+# ── Portfolio ────────────────────────────────────────────────────────────────
+
+# Fraction of NM market value retained at each condition grade.
+_CONDITION_MULTIPLIER = {
+    "NM":      1.00,
+    "LP":      0.85,
+    "MP":      0.70,
+    "HP":      0.50,
+    "Damaged": 0.30,
+}
+
+# Composite score → 1-line verdict bucket (mirrors analyzer thresholds).
+def _verdict_bucket(score: float | None) -> str:
+    if score is None:
+        return "No Data"
+    if score >= 60:  return "Strong Sell"
+    if score >= 25:  return "Sell"
+    if score > -25:  return "Hold"
+    if score > -60:  return "Buy"
+    return "Strong Buy"
+
+
+@app.get("/api/portfolio/{user_id}")
+def get_portfolio(user_id: int):
+    """
+    Return the user's holdings and value-history WITHOUT pricing any cards.
+    Live valuation is deferred to POST /api/portfolio/{user_id}/value so the
+    page loads instantly and the pricing APIs are only hit on demand.
+    """
+    from src.db import get_collection as _get, get_snapshots
+
+    cards = _get(user_id)
+    total_sets = len({c.get("set_name") for c in cards if c.get("set_name")})
+    return {
+        "cards": cards,
+        "stats": {
+            "card_count": len(cards),
+            "set_count":  total_sets,
+        },
+        "history": get_snapshots(user_id),
+    }
+
+
+@app.post("/api/portfolio/{user_id}/value")
+def value_portfolio(user_id: int):
+    """
+    Value every card in the user's collection through the live/simulated
+    pricing engine, record a daily snapshot, and return per-card valuations
+    plus aggregate stats. Called on demand (button click), never on page load.
+    """
+    from src.db import get_collection as _get, record_snapshot, get_snapshots
+
+    cards = _get(user_id)
+    valued = []
+    total_value = 0.0
+    score_sum = 0.0
+    scored_n = 0
+    buckets: dict[str, int] = {}
+
+    for c in cards:
+        cond = c.get("condition", "NM")
+        mult = _CONDITION_MULTIPLIER.get(cond, 1.0)
+        req = AnalyzeRequest(
+            card_name=c["card_name"],
+            set_name=c.get("set_name") or "",
+            number=c.get("card_number") or None,
+            card_id=c.get("card_id") or None,
+        )
+        try:
+            res = _run_analysis(req)
+            market = res.get("market_price")
+            score = (res.get("analysis") or {}).get("composite_score")
+            rec = (res.get("analysis") or {}).get("recommendation")
+        except HTTPException:
+            market, score, rec = None, None, None
+        except Exception:
+            market, score, rec = None, None, None
+
+        value = round(market * mult, 2) if market else None
+        if value:
+            total_value += value
+        if score is not None:
+            score_sum += score
+            scored_n += 1
+        bucket = _verdict_bucket(score)
+        buckets[bucket] = buckets.get(bucket, 0) + 1
+
+        valued.append({
+            "entry_id":       c["id"],
+            "card_name":      c["card_name"],
+            "set_name":       c.get("set_name"),
+            "card_number":    c.get("card_number"),
+            "rarity":         c.get("rarity"),
+            "condition":      cond,
+            "image_url":      c.get("image_url"),
+            "market_price":   market,
+            "value":          value,
+            "composite_score": score,
+            "recommendation": rec or "Insufficient Data",
+        })
+
+    record_snapshot(user_id, total_value, len(cards))
+
+    avg_score = round(score_sum / scored_n, 1) if scored_n else None
+    priced = [v for v in valued if v["value"]]
+    most_valuable = max(priced, key=lambda v: v["value"], default=None)
+    best_buy = min(
+        (v for v in valued if v["composite_score"] is not None),
+        key=lambda v: v["composite_score"], default=None,
+    )
+    top_sell = max(
+        (v for v in valued if v["composite_score"] is not None),
+        key=lambda v: v["composite_score"], default=None,
+    )
+
+    return {
+        "cards": valued,
+        "stats": {
+            "total_value":    round(total_value, 2),
+            "card_count":     len(cards),
+            "priced_count":   len(priced),
+            "avg_score":      avg_score,
+            "overall_verdict": _verdict_bucket(avg_score),
+        },
+        "buckets": buckets,
+        "highlights": {
+            "most_valuable": most_valuable,
+            "best_buy":      best_buy,
+            "top_sell":      top_sell,
+        },
+        "history": get_snapshots(user_id),
+    }
+
+
 # ── Static + page routes ─────────────────────────────────────────────────────
 
 def _page(path: str) -> FileResponse:
@@ -252,6 +386,11 @@ def page_compare():
 @app.get("/collection")
 def page_collection():
     return _page("static/collection.html")
+
+
+@app.get("/portfolio")
+def page_portfolio():
+    return _page("static/portfolio.html")
 
 
 @app.get("/game")
