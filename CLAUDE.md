@@ -41,6 +41,8 @@ Open **http://127.0.0.1:8000** after starting the server.
 |---|---|
 | `card_db.py` | Loads card JSON from `data/cards/en/` into a `CardDatabase`; search and filter |
 | `scraper.py` | API clients for PokéWallet, PokeTrace, TCGPlayer; disk caching of sets/tokens |
+| `cardsight.py` | CardSight AI client — real PSA graded sale medians via `pricing/search`; disk-cached (750/mo quota) |
+| `psa.py` | PSA public API client — cert-number lookup (real grade + population) |
 | `card_valuator.py` | Simulated pricing engine — rarity base prices + weighted multipliers |
 | `analyzer.py` | 10-factor composite scoring: trend, popularity, scarcity, pull odds, volatility, etc. |
 | `pokemon_popularity.py` | Static popularity scores for all 1025 species |
@@ -63,5 +65,5 @@ git push
 
 ### Configuration
 
-- API keys go in `.env`: `POKEWALLET_API_KEY`, `POKETRACE_API_KEY`, `TCGPLAYER_PUBLIC_KEY`, `TCGPLAYER_PRIVATE_KEY`
+- API keys go in `.env`: `POKEWALLET_API_KEY`, `POKETRACE_API_KEY`, `TCGPLAYER_PUBLIC_KEY`, `TCGPLAYER_PRIVATE_KEY`, `CARDSIGHT_API_KEY` (real graded prices), `PSA_API_KEY` (cert lookup)
 - `data/prices/results.csv` and `.env` are gitignored

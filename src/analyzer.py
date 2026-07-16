@@ -405,6 +405,30 @@ def _simulate_graded(raw_price: float, card_details: dict) -> tuple[float, float
     return round(raw_price * psa9_mult, 2), round(raw_price * psa10_mult, 2)
 
 
+def estimate_graded_prices(raw_price: float | None, card_details: dict | None) -> dict | None:
+    """
+    Public wrapper: estimate PSA 9 / PSA 10 values for a raw card.
+
+    Returns None when there's no raw price to base the estimate on. The
+    multipliers are grounded in real-hobby observations (see _GRADE_MULTIPLIERS)
+    but the result is an ESTIMATE — PSA's API does not expose graded prices.
+    """
+    if not raw_price or not card_details:
+        return None
+    era = _card_era(card_details.get("id", "recent-0"))
+    rarity = card_details.get("rarity", "Common")
+    psa9_mult, psa10_mult = _GRADE_MULTIPLIERS.get((era, rarity), _GRADE_DEFAULT)
+    psa9, psa10 = _simulate_graded(raw_price, card_details)
+    return {
+        "raw_price":   round(raw_price, 2),
+        "psa9_price":  psa9,
+        "psa10_price": psa10,
+        "psa9_mult":   psa9_mult,
+        "psa10_mult":  psa10_mult,
+        "era":         era,
+    }
+
+
 def _load_card_db() -> list:
     """Lazily load all card dicts for pull-odds counting."""
     global _card_db_cache

@@ -18,7 +18,13 @@ POKEWALLET_API_KEY=...
 POKETRACE_API_KEY=...
 TCGPLAYER_PUBLIC_KEY=...
 TCGPLAYER_PRIVATE_KEY=...
+CARDSIGHT_API_KEY=...   # real graded (PSA) sale prices for the Grading ROI panel
+PSA_API_KEY=...         # optional: PSA cert-number lookup (grade + population)
 ```
+
+All keys are optional — the app falls back to estimated graded prices when
+`CARDSIGHT_API_KEY` is absent, and the PSA cert lookup is simply disabled
+without `PSA_API_KEY`.
 
 ## Features
 
@@ -33,6 +39,11 @@ TCGPLAYER_PRIVATE_KEY=...
 - Market snapshot table (floor / mid / market / high) linked to TCGPlayer
 - Variant switching for alternate printings (1st edition, shadowless, IRs, etc.)
 - Falls back to simulated pricing if no live data is available
+- **Grading ROI panel** — real PSA 9 / PSA 10 sale medians via the **CardSight AI**
+  API (falls back to era/rarity estimates), with an editable grading fee that
+  computes net profit and ROI% per grade
+- **PSA cert lookup** — enter a PSA cert number to fetch the real grade and
+  population report (requires `PSA_API_KEY`)
 
 ### Compare Cards (`/compare`)
 - Search two cards and run valuations in a single request
@@ -93,7 +104,8 @@ data/
 | GET | `/api/health` | Server status + card count |
 | GET | `/api/popularity` | Top-20 rankings + DB stats |
 | GET | `/api/search?q=` | Card search by name |
-| POST | `/api/analyze` | Full valuation for one card |
+| POST | `/api/analyze` | Full valuation for one card (includes grading-ROI block) |
+| GET | `/api/psa/cert/{cert_number}` | PSA cert lookup — real grade + population |
 | POST | `/api/compare` | Parallel valuation for two cards |
 | POST | `/api/auth/register` | Create account |
 | POST | `/api/auth/login` | Log in, returns `{id, username}` |

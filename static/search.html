@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Card Search — PokéValue</title>
-  <link rel="stylesheet" href="/static/style.css?v=7">
+  <link rel="stylesheet" href="/static/style.css?v=8">
   <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
   <style>
     .search-bar { display:flex; gap:0.75rem; margin-bottom:0.75rem; }
@@ -42,7 +42,7 @@
     </div>
   </div>
 
-  <script src="/static/nav.js?v=7"></script>
+  <script src="/static/nav.js?v=8"></script>
   <script>
     var state = { results:[], selected:null, analysis:null, variants:[], variantIdx:0, rawPrices:[] };
 
@@ -122,8 +122,91 @@
       }, {responsive:true,displayModeBar:false});
     }
 
+    function gradingHtml(g) {
+      if (!g) return '';
+      var srcBadge = g.source === 'cardsight'
+        ? '<span class="badge-live">&#9679; Real PSA sales (CardSight)</span>'
+        : '<span class="badge-sim">&#9679; Estimated</span>';
+      var asOf = g.as_of ? ' &middot; latest sale ' + g.as_of : '';
+      return '<hr><h3>Grading ROI</h3>' +
+        '<div style="margin:0.2rem 0 0.7rem;">' + srcBadge + '<span style="color:#6b7280;font-size:0.72rem;">' + asOf + '</span></div>' +
+        '<div style="display:flex;align-items:center;gap:0.6rem;margin:0 0 0.9rem;">' +
+          '<label style="margin:0;color:#9ca3af;font-size:0.82rem;white-space:nowrap;">Grading fee&nbsp;$</label>' +
+          '<input type="number" id="grade-fee" value="25" min="0" step="1" style="width:90px;">' +
+          '<span style="color:#6b7280;font-size:0.75rem;">per card</span>' +
+        '</div>' +
+        '<div class="metric-row" id="roi-boxes"></div>' +
+        '<p style="color:#6b7280;font-size:0.72rem;margin-top:0.6rem;">Cost basis = raw price ' + fmtPrice(g.raw_price) +
+          ' + grading fee. Grades marked <em>est.</em> fall back to era/rarity multipliers when no real sales are found.</p>';
+    }
+
+    function renderRoi() {
+      var g = state.grading;
+      if (!g) return;
+      var feeEl = document.getElementById('grade-fee');
+      var fee = parseFloat(feeEl && feeEl.value) || 0;
+      var cost = g.raw_price + fee;
+      function box(label, graded, source, count) {
+        if (graded == null) return '';
+        var net = graded - cost;
+        var roi = cost > 0 ? (net / cost * 100) : 0;
+        var mult = g.raw_price > 0 ? (graded / g.raw_price) : 0;
+        var col = net >= 0 ? '#22c55e' : '#ef4444';
+        var netStr = (net >= 0 ? '+' : '−') + fmtPrice(Math.abs(net));
+        var roiStr = (roi >= 0 ? '+' : '−') + Math.abs(roi).toFixed(0) + '%';
+        var tag = source === 'real'
+          ? '<span style="color:#22c55e;">' + count + ' sale' + (count === 1 ? '' : 's') + '</span>'
+          : '<span style="color:#9ca3af;">est.</span>';
+        return '<div class="metric-box">' +
+          '<div class="metric-label">' + label + ' &middot; ~' + mult.toFixed(1) + '× &middot; ' + tag + '</div>' +
+          '<div class="metric-value">' + fmtPrice(graded) + '</div>' +
+          '<div style="color:' + col + ';font-weight:700;font-size:0.8rem;margin-top:0.2rem;">' + netStr + ' &middot; ' + roiStr + '</div>' +
+          '</div>';
+      }
+      var html = box('PSA 9', g.psa9_price, g.psa9_source, g.psa9_count) +
+                 box('PSA 10', g.psa10_price, g.psa10_source, g.psa10_count);
+      document.getElementById('roi-boxes').innerHTML = html;
+    }
+
+    function psaLookupHtml() {
+      return '<hr><h3>PSA Cert Lookup</h3>' +
+        '<p style="color:#9ca3af;font-size:0.8rem;margin:0 0 0.6rem;">Already graded? Enter the PSA cert number for the real grade &amp; population report.</p>' +
+        '<div style="display:flex;gap:0.6rem;max-width:420px;">' +
+          '<input type="text" id="psa-cert-input" placeholder="e.g. 12345678" style="flex:1;">' +
+          '<button class="btn" id="psa-cert-btn">LOOK UP</button>' +
+        '</div><div id="psa-cert-result" style="margin-top:0.75rem;"></div>';
+    }
+
+    function doPsaLookup() {
+      var el = document.getElementById('psa-cert-input');
+      var cn = (el && el.value || '').trim();
+      var out = document.getElementById('psa-cert-result');
+      if (!cn) return;
+      out.innerHTML = '<span class="spinner"></span> Looking up cert…';
+      fetch('/api/psa/cert/' + encodeURIComponent(cn))
+        .then(function (r) { if (!r.ok) return r.json().then(function (e) { throw new Error(e.detail || 'Lookup failed'); }); return r.json(); })
+        .then(function (c) {
+          var pop = c.total_population != null ? c.total_population.toLocaleString() : '—';
+          var higher = c.population_higher != null ? c.population_higher.toLocaleString() : '—';
+          var rows = [
+            ['Grade', c.grade_description || c.grade || '—'],
+            ['Subject', c.subject || '—'],
+            ['Year / Brand', [c.year, c.brand].filter(Boolean).join(' ') || '—'],
+            ['Card #', c.card_number || '—'],
+            ['Variety', c.variety || '—'],
+            ['Population at this grade', pop],
+            ['Graded higher', higher],
+          ];
+          out.innerHTML = '<div class="psa-box" style="border-color:#FFDE00;text-align:left;padding:0.6rem 1rem;">' +
+            rows.map(function (r) { return '<div class="detail-row"><div class="detail-label">' + r[0] + '</div><div style="color:#e8e8e8;">' + r[1] + '</div></div>'; }).join('') +
+            '</div>';
+        })
+        .catch(function (e) { out.innerHTML = '<div class="alert alert-error">' + e.message + '</div>'; });
+    }
+
     function renderResults(data) {
       var a = data.analysis, d = data.details || {}, images = d.images || {};
+      state.grading = data.grading || null;
       var imgUrl = images.large || images.small || '';
       var marketPrice = data.market_price || a.average_price;
       var dsHtml = data.data_source === 'live'
@@ -172,6 +255,9 @@
         '</div></details>';
       html += '</div></div>';
 
+      html += gradingHtml(data.grading);
+      html += psaLookupHtml();
+
       if ((data.raw_prices || []).length >= 5) html += '<hr><h3>Price History</h3><div id="price-chart"></div>';
 
       var snap = {low:data.low_price,mid:data.mid_price,market:data.market_price,high:data.high_price};
@@ -194,6 +280,16 @@
       document.getElementById('results-section').style.display = 'block';
       renderGauge(a.composite_score, 'gauge-chart');
       if ((data.raw_prices || []).length >= 5) renderPriceChart(data.raw_prices, a.average_price);
+
+      if (data.grading) {
+        renderRoi();
+        document.getElementById('grade-fee').addEventListener('input', renderRoi);
+      }
+      var psaBtn = document.getElementById('psa-cert-btn');
+      if (psaBtn) {
+        psaBtn.addEventListener('click', doPsaLookup);
+        document.getElementById('psa-cert-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') doPsaLookup(); });
+      }
 
       var varSel = document.getElementById('variant-select');
       if (varSel) {

@@ -90,6 +90,60 @@ class AnalyzeRequest(BaseModel):
     card_id: str | None = None
 
 
+def _build_grading(market, card_details: dict, req: "AnalyzeRequest") -> dict | None:
+    """
+    Build the grading-ROI block. Prefers REAL PSA sale medians from CardSight AI;
+    falls back to simulated estimates (analyzer multipliers) per grade when a
+    real value is missing. Raw cost basis is the TCGPlayer market price.
+    """
+    from src.analyzer import estimate_graded_prices
+
+    est = estimate_graded_prices(market, card_details)
+    if not est:
+        return None
+
+    block = {
+        "source":       "estimated",
+        "raw_price":    est["raw_price"],
+        "psa9_price":   est["psa9_price"],
+        "psa10_price":  est["psa10_price"],
+        "psa9_source":  "estimated",
+        "psa10_source": "estimated",
+        "psa9_count":   None,
+        "psa10_count":  None,
+        "as_of":        None,
+    }
+
+    try:
+        from src.cardsight import get_graded_prices
+        real = get_graded_prices(
+            req.card_name,
+            card_local_id=card_details.get("id"),
+            set_name=req.set_name,
+            number=req.number,
+        )
+    except Exception:
+        real = {"error": "api_error"}
+
+    if not real.get("error"):
+        if real.get("psa10"):
+            block["psa10_price"]  = real["psa10"]["price"]
+            block["psa10_source"] = "real"
+            block["psa10_count"]  = real["psa10"]["count"]
+        if real.get("psa9"):
+            block["psa9_price"]  = real["psa9"]["price"]
+            block["psa9_source"] = "real"
+            block["psa9_count"]  = real["psa9"]["count"]
+        block["as_of"] = real.get("as_of")
+        block["cardsight_raw"] = (real.get("raw") or {}).get("price")
+        if block["psa9_source"] == "real" or block["psa10_source"] == "real":
+            block["source"] = "cardsight"
+    else:
+        block["cardsight_error"] = real["error"]
+
+    return block
+
+
 def _run_analysis(req: AnalyzeRequest) -> dict:
     from src.scraper import get_card_prices
     from src.analyzer import analyze_card
@@ -121,6 +175,12 @@ def _run_analysis(req: AnalyzeRequest) -> dict:
         if m:
             raw_prices.append(float(m.group()))
 
+    grading = _build_grading(
+        market,
+        {"id": (details or {}).get("id") or card_id, "rarity": (details or {}).get("rarity")},
+        req,
+    )
+
     return {
         "analysis": analysis,
         "details": {
@@ -129,6 +189,7 @@ def _run_analysis(req: AnalyzeRequest) -> dict:
             "types":  (details or {}).get("types", []),
             "images": (details or {}).get("images", {}),
         },
+        "grading":       grading,
         "market_price":  market,
         "low_price":     low,
         "mid_price":     mid,
@@ -143,6 +204,22 @@ def _run_analysis(req: AnalyzeRequest) -> dict:
 @app.post("/api/analyze")
 def analyze(req: AnalyzeRequest):
     return _run_analysis(req)
+
+
+# ── PSA cert lookup ────────────────────────────────────────────────────────────
+
+@app.get("/api/psa/cert/{cert_number}")
+def psa_cert(cert_number: str):
+    from src.psa import get_cert
+    result = get_cert(cert_number)
+    err = result.get("error")
+    if err == "no_key":
+        raise HTTPException(status_code=400, detail="PSA API key not configured. Add PSA_API_KEY to your .env file.")
+    if err == "not_found":
+        raise HTTPException(status_code=404, detail=f"No PSA cert found for #{cert_number}.")
+    if err == "api_error":
+        raise HTTPException(status_code=502, detail=result.get("detail", "PSA API request failed."))
+    return result
 
 
 # ── Compare ──────────────────────────────────────────────────────────────────
