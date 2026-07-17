@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Card Search — PokéValue</title>
-  <link rel="stylesheet" href="/static/style.css?v=9">
+  <link rel="stylesheet" href="/static/style.css?v=10">
   <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
   <style>
     .search-bar { display:flex; gap:0.75rem; margin-bottom:0.75rem; }
@@ -22,23 +22,23 @@
     </div>
 
     <div class="search-bar">
-      <input type="text" id="query" placeholder="Charizard, Pikachu, Lugia…">
+      <input type="text" id="query" placeholder="Charizard, Pikachu, Lugia…" aria-label="Search for a Pokémon card by name">
       <button class="btn" id="search-btn">SEARCH</button>
     </div>
-    <div id="search-msg"></div>
+    <div id="search-msg" role="status" aria-live="polite"></div>
 
     <div id="picker-section" style="display:none;">
       <div class="card-select-row">
-        <select id="card-select"></select>
+        <select id="card-select" aria-label="Choose a card to analyze"></select>
         <button class="btn" id="analyze-btn">ANALYZE CARD</button>
       </div>
     </div>
 
     <div id="results-section">
-      <div id="spinner-row" style="display:none;padding:1rem 0;">
+      <div id="spinner-row" role="status" aria-live="polite" style="display:none;padding:1rem 0;">
         <span class="spinner"></span> Crunching numbers…
       </div>
-      <div id="results-inner"></div>
+      <div id="results-inner" aria-live="polite"></div>
     </div>
   </div>
 

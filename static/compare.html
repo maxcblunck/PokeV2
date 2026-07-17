@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Compare — PokéValue</title>
-  <link rel="stylesheet" href="/static/style.css?v=7">
+  <link rel="stylesheet" href="/static/style.css?v=10">
   <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
   <style>
     .compare-cols { display:grid; grid-template-columns:1fr 1fr; gap:2rem; }
@@ -28,20 +28,20 @@
       <div class="compare-col">
         <h3>Card A</h3>
         <div class="col-search">
-          <input type="text" id="q-a" placeholder="Card name…">
+          <input type="text" id="q-a" placeholder="Card name…" aria-label="First card name to compare">
           <button class="btn" onclick="doSearch('a')">SEARCH</button>
         </div>
-        <div id="msg-a"></div>
-        <select id="sel-a" style="display:none;width:100%;margin-top:0.5rem;"></select>
+        <div id="msg-a" role="status" aria-live="polite"></div>
+        <select id="sel-a" style="display:none;width:100%;margin-top:0.5rem;" aria-label="Choose first card"></select>
       </div>
       <div class="compare-col">
         <h3>Card B</h3>
         <div class="col-search">
-          <input type="text" id="q-b" placeholder="Card name…">
+          <input type="text" id="q-b" placeholder="Card name…" aria-label="Second card name to compare">
           <button class="btn" onclick="doSearch('b')">SEARCH</button>
         </div>
-        <div id="msg-b"></div>
-        <select id="sel-b" style="display:none;width:100%;margin-top:0.5rem;"></select>
+        <div id="msg-b" role="status" aria-live="polite"></div>
+        <select id="sel-b" style="display:none;width:100%;margin-top:0.5rem;" aria-label="Choose second card"></select>
       </div>
     </div>
 
@@ -49,7 +49,7 @@
       <button class="btn" id="analyze-btn" style="padding:0.8rem 2rem;">ANALYZE BOTH</button>
     </div>
 
-    <div id="compare-results" style="display:none;"></div>
+    <div id="compare-results" style="display:none;" aria-live="polite"></div>
   </div>
 
   <script src="/static/nav.js?v=7"></script>

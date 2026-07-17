@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Collection — PokéValue</title>
-  <link rel="stylesheet" href="/static/style.css?v=7">
+  <link rel="stylesheet" href="/static/style.css?v=10">
   <style>
     .auth-wrap { max-width:380px; margin:2rem auto; }
     .add-row   { display:flex; gap:0.75rem; margin-bottom:0.75rem; }
@@ -18,15 +18,15 @@
 
     <div id="auth-section">
       <p style="color:#ccc;margin-bottom:1.5rem;">Create an account or log in to track your cards.</p>
-      <div class="auth-tabs">
-        <div class="auth-tab active" id="tab-login" onclick="switchTab('login')">Login</div>
-        <div class="auth-tab" id="tab-register" onclick="switchTab('register')">Register</div>
+      <div class="auth-tabs" role="tablist" aria-label="Login or register">
+        <button type="button" class="auth-tab active" id="tab-login" role="tab" aria-selected="true" onclick="switchTab('login')">Login</button>
+        <button type="button" class="auth-tab" id="tab-register" role="tab" aria-selected="false" onclick="switchTab('register')">Register</button>
       </div>
 
       <div class="auth-wrap" id="form-login">
         <div class="form-group"><label>Username</label><input type="text" id="l-user"></div>
         <div class="form-group"><label>Password</label><input type="password" id="l-pass"></div>
-        <div id="login-msg"></div>
+        <div id="login-msg" role="alert" aria-live="assertive"></div>
         <button class="btn btn-full" onclick="doLogin()">LOG IN</button>
       </div>
 
@@ -34,7 +34,7 @@
         <div class="form-group"><label>Choose a username</label><input type="text" id="r-user"></div>
         <div class="form-group"><label>Choose a password</label><input type="password" id="r-pass"></div>
         <div class="form-group"><label>Confirm password</label><input type="password" id="r-pass2"></div>
-        <div id="register-msg"></div>
+        <div id="register-msg" role="alert" aria-live="assertive"></div>
         <button class="btn btn-full" onclick="doRegister()">CREATE ACCOUNT</button>
       </div>
     </div>
@@ -48,11 +48,11 @@
 
       <h4 style="color:#FFDE00;margin-bottom:0.75rem;">Add Cards</h4>
       <div class="add-row">
-        <input type="text" id="add-query" placeholder="Search Pokémon card name…">
+        <input type="text" id="add-query" placeholder="Search Pokémon card name…" aria-label="Search Pokémon card name to add to your collection">
         <button class="btn" onclick="doAddSearch()">Search</button>
       </div>
-      <div id="add-msg"></div>
-      <select id="add-select" style="display:none;margin-bottom:0.75rem;"></select>
+      <div id="add-msg" role="status" aria-live="polite"></div>
+      <select id="add-select" style="display:none;margin-bottom:0.75rem;" aria-label="Choose which card to add"></select>
       <div id="add-card-preview"></div>
 
       <hr>
@@ -73,8 +73,12 @@
     function clearUser() { user = null; localStorage.removeItem('pv_user'); }
 
     function switchTab(tab) {
-      document.getElementById('tab-login').classList.toggle('active', tab === 'login');
-      document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+      var login = document.getElementById('tab-login');
+      var register = document.getElementById('tab-register');
+      login.classList.toggle('active', tab === 'login');
+      register.classList.toggle('active', tab === 'register');
+      login.setAttribute('aria-selected', tab === 'login');
+      register.setAttribute('aria-selected', tab === 'register');
       document.getElementById('form-login').style.display    = tab === 'login'    ? '' : 'none';
       document.getElementById('form-register').style.display = tab === 'register' ? '' : 'none';
     }
